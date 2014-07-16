@@ -41,35 +41,39 @@ main = do
     withWindow width height "Resurrection" $ \win -> do
           initGL width height
           setWindowCloseCallback     win $ Just $ windowCloseCallback closed
-          setKeyCallback             win $ Just $ keyCallback keyPressSink closeGameSink
           setWindowSizeCallback      win $ Just $ resizeGL windowSizeSink
 
           -- All we need to get going is an IO-valued signal and an IO
           -- function to update the external signals
-          game <- start $ resurrection keyPress windowSize win
+          game <- start $ resurrection windowSize win
           driveNetwork game (readInput win closed)
 
           -- The inevitable sad ending
           exitWith ExitSuccess
 
 -- TODO limits of the world - go round?
-updateFromKey :: Vector2 GLdouble -> Maybe Direction -> Vector2 GLdouble
-updateFromKey (Vector2 x y) keyP = case keyP of
-                                     Just GoLeft  -> Vector2 (x - 5) y
-                                     Just GoUp    -> Vector2 x (y + 5)
-                                     Just GoDown  -> Vector2 x (y - 5)
-                                     Just GoRight -> Vector2 (x + 5) y
+updateFromKey :: Vector2 GLdouble -> (Bool, Bool, Bool, Bool) -> Vector2 GLdouble
+updateFromKey (Vector2 x y) keyP = case keyP of -- todo: all keys pressed considered?
+                                     (True, _, _, _)  -> Vector2 (x - 5) y
+                                     (_, True, _, _)   -> Vector2 x (y + 5)
+                                     (_, _, True, _)  -> Vector2 x (y - 5)
+                                     (_, _, _, True) -> Vector2 (x + 5) y
                                      otherwise    -> Vector2 x y
 
-resurrection :: Signal (Maybe Direction) -> Signal (GLdouble, GLdouble) -> Window -> SignalGen Double (Signal (IO())) 
-resurrection keyPress windowSize window  = do 
+resurrection :: Signal (GLdouble, GLdouble) -> Window -> SignalGen Double (Signal (IO())) 
+resurrection windowSize window  = do 
+                                              directionControl <- effectful $ (,,,)
+                                                <$> keyIsPressed window Key'Left
+                                                <*> keyIsPressed window Key'Up
+                                                <*> keyIsPressed window Key'Down
+                                                <*> keyIsPressed window Key'Right
                                               fpsTracking <- stateful (0, 0, Nothing) $ \dt (time, count, _) ->
                                                     let time' = time + dt
                                                         done = time > 5
                                                     in if done
                                                     then (0, 0, Just (count / time'))
                                                     else (time', count + 1, Nothing)
-                                              playerPos <- transfer playerPos0 (\dt keyP p -> updateFromKey p keyP) keyPress
+                                              playerPos <- transfer playerPos0 (\dt keyP p -> updateFromKey p keyP) directionControl
                                               -- playerPos' <- delay playerPos0 playerPos
                                               return $ (renderLevel window) <$> playerPos <*> fpsTracking
 
