@@ -47,7 +47,7 @@ main = do
           -- All we need to get going is an IO-valued signal and an IO
           -- function to update the external signals
           game <- start $ resurrection keyPress windowSize win
-          driveNetwork game (readInput closed)
+          driveNetwork game (readInput win closed)
 
           -- The inevitable sad ending
           exitWith ExitSuccess
@@ -74,15 +74,17 @@ resurrection keyPress windowSize window  = do
                                               return $ (renderLevel window) <$> playerPos <*> fpsTracking
 
 
-readInput closed = do
+readInput window closed = do
     -- threadDelay 0 -- to avoid continuous polling, normally 20ms by default (see elerea-examples)
 
     t <- getTime
     resetTime
 
+    k <- keyIsPressed window Key'Escape
+
     c <- readIORef closed
 
-    return $ if c || (t == Nothing) then Nothing else Just (realToFrac (fromJust t))
+    return $ if k || c || (t == Nothing) then Nothing else Just (realToFrac (fromJust t))
 
 resetTime :: IO ()
 resetTime =
@@ -116,3 +118,11 @@ renderLevel window (Vector2 x y) (_,_,fps) = do
                                                 flush
                                                 swapBuffers window
                                                 pollEvents -- Necessary for it not to freeze.
+
+isPress :: KeyState -> Bool
+isPress KeyState'Pressed   = True
+isPress KeyState'Repeating = True
+isPress _                       = False
+
+keyIsPressed :: Window -> Key -> IO Bool
+keyIsPressed win key = isPress `fmap` GLFW.getKey win key
