@@ -26,7 +26,7 @@ main = do
 
     (keyPress,keyPressSink) <- external Nothing
     (closeGame, closeGameSink) <- external False
-    (windowSize,windowSizeSink) <- external (0,0)
+    (windowSize,windowSizeSink) <- external (fromIntegral width, (fromIntegral height :: GLdouble))
     closed <- newIORef False
 
     withWindow width height "Resurrection" $ \win -> do
@@ -34,9 +34,10 @@ main = do
           setWindowCloseCallback     win $ Just $ windowCloseCallback closed
           setWindowSizeCallback      win $ Just $ resizeGL windowSizeSink
 
+          mbBackground <- loadTexture "images/rocks.jpg"
           -- All we need to get going is an IO-valued signal and an IO
           -- function to update the external signals
-          game <- start $ resurrection windowSize win
+          game <- start $ resurrection windowSize mbBackground win
           driveNetwork game (readInput win closed)
 
           -- The inevitable sad ending
@@ -51,8 +52,8 @@ updateFromKey (Vector2 x y) keyP = case keyP of -- todo: all keys pressed consid
                                      (_, _, _, True) -> Vector2 (x + 5) y
                                      otherwise    -> Vector2 x y
 
-resurrection :: Signal (GLdouble, GLdouble) -> Window -> SignalGen Double (Signal (IO())) 
-resurrection windowSize window  = do 
+resurrection :: Signal (GLdouble, GLdouble) -> Maybe TextureObject -> Window -> SignalGen Double (Signal (IO())) 
+resurrection windowSize mbBackground window  = do 
                                               directionControl <- effectful $ (,,,)
                                                 <$> keyIsPressed window Key'Left
                                                 <*> keyIsPressed window Key'Up
@@ -65,8 +66,9 @@ resurrection windowSize window  = do
                                                     then (0, 0, Just (count / time'))
                                                     else (time', count + 1, Nothing)
                                               playerPos <- transfer playerPos0 (\dt keyP p -> updateFromKey p keyP) directionControl
-                                              -- playerPos' <- delay playerPos0 playerPos
-                                              return $ (renderLevel window) <$> playerPos <*> fpsTracking
+                                              -- only happen once during game?
+
+                                              return $ (renderLevel mbBackground window) <$> windowSize <*> playerPos <*> fpsTracking
 
 
 readInput window closed = do
@@ -85,7 +87,28 @@ resetTime :: IO ()
 resetTime =
     setTime (0 :: Double)
 
+drawBackground :: (GLdouble, GLdouble) -> Maybe TextureObject -> IO ()
+drawBackground (width, height) mbTexture = do
+                            texture Texture2D $= Enabled
+                            textureFunction $= Replace
+                            textureBinding Texture2D $= mbTexture
+                            loadIdentity
+                            renderPrimitive Quads $ do
+                                vertex $ Vertex2 (0 :: GLdouble) 0
+                                toTexture (0, 0) 
+                                vertex $ Vertex2 width           0
+                                toTexture (1, 0)
+                                vertex $ Vertex2 width           height
+                                toTexture (1, 1)
+                                vertex $ Vertex2 0               height
+                                toTexture (0, 1)
+                            texture Texture2D $= Disabled
+
+toTexture (x,y) = texCoord2f (TexCoord2 x y)
+                where texCoord2f = texCoord :: TexCoord2 GLfloat -> IO ()
+
 drawPlayer (Vector2 x y) = do
+        color $ Color4 0 0 1.0 (1 :: GLfloat)
         loadIdentity
         renderPrimitive Quads $ do
             vertex $ Vertex2 (x)             (y)
@@ -93,13 +116,14 @@ drawPlayer (Vector2 x y) = do
             vertex $ Vertex2 (x+playerWidth) (y+playerHeight)
             vertex $ Vertex2 (x)             (y+playerHeight)
 
-renderLevel :: Window -> Vector2 GLdouble -> (Double, Double, Maybe Double) -> IO ()
-renderLevel window playerPos (_,_,fps) = do 
+
+renderLevel :: Maybe TextureObject -> Window -> (GLdouble, GLdouble) -> Vector2 GLdouble -> (Double, Double, Maybe Double) -> IO ()
+renderLevel mbBackground window windowSize playerPos (_,_,fps) = do 
                                                 case fps of
                                                     Just value -> putStrLn $ "FPS: " ++ show value
                                                     Nothing -> return ()
                                                 clear [ColorBuffer, DepthBuffer]
-                                                color $ Color4 0.2 0.2 0.2 (1 :: GLfloat)
+                                                drawBackground windowSize mbBackground
                                                 drawPlayer playerPos
                                                 flush
                                                 swapBuffers window
