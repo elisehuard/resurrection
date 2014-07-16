@@ -115,3 +115,4 @@ renderLevel window (Vector2 x y) (_,_,fps) = do
                                                 drawPlayer x y
                                                 flush
                                                 swapBuffers window
+                                                pollEvents -- Necessary for it not to freeze.
