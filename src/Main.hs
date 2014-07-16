@@ -10,20 +10,11 @@ import "GLFW-b" Graphics.UI.GLFW as GLFW
 import Control.Concurrent (threadDelay)
 import Data.Maybe (fromJust)
 
-data Direction = GoRight | GoLeft | GoUp | GoDown
 
 -- initial player position
 playerPos0 = Vector2 200 200
 playerWidth = 20 
 playerHeight = (20 :: GLdouble)
-
-keyCallback :: ((Maybe Direction) -> IO()) -> (Bool -> IO()) -> Window -> Key -> Int -> KeyState -> ModifierKeys -> IO ()
-keyCallback keyPress close win Key'Right _ _ _ = keyPress $ Just GoRight
-keyCallback keyPress close win Key'Left  _ _ _ = keyPress $ Just GoLeft
-keyCallback keyPress close win Key'Up    _ _ _ = keyPress $ Just GoUp
-keyCallback keyPress close win Key'Down  _ _ _ = keyPress $ Just GoDown
-keyCallback keyPress close win Key'Escape _ _ _ = close $ True 
-keyCallback keyPress _     win _         _ _ _ = return ()
 
 windowCloseCallback closed window = do writeIORef closed True
                                        return ()
