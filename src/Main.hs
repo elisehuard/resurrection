@@ -90,7 +90,7 @@ resetTime :: IO ()
 resetTime =
     setTime (0 :: Double)
 
-drawPlayer x y = do
+drawPlayer (Vector2 x y) = do
         loadIdentity
         renderPrimitive Quads $ do
             vertex $ Vertex2 (x)             (y)
@@ -108,13 +108,13 @@ resizeGL windowSizeSink window w h = do
                                          matrixMode $= Modelview 0
 
 renderLevel :: Window -> Vector2 GLdouble -> (Double, Double, Maybe Double) -> IO ()
-renderLevel window (Vector2 x y) (_,_,fps) = do 
+renderLevel window playerPos (_,_,fps) = do 
                                                 case fps of
                                                     Just value -> putStrLn $ "FPS: " ++ show value
                                                     Nothing -> return ()
                                                 clear [ColorBuffer, DepthBuffer]
                                                 color $ Color4 0.2 0.2 0.2 (1 :: GLfloat)
-                                                drawPlayer x y
+                                                drawPlayer playerPos
                                                 flush
                                                 swapBuffers window
                                                 pollEvents -- Necessary for it not to freeze.
