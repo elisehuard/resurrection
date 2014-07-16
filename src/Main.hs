@@ -13,9 +13,9 @@ import Data.Maybe (fromJust)
 data Direction = GoRight | GoLeft | GoUp | GoDown
 
 -- initial player position
-playerPos0 = Vector2 0 0
-playerWidth = 5 
-playerHeight = (5 :: GLdouble)
+playerPos0 = Vector2 200 200
+playerWidth = 20 
+playerHeight = (20 :: GLdouble)
 
 keyCallback :: ((Maybe Direction) -> IO()) -> (Bool -> IO()) -> Window -> Key -> Int -> KeyState -> ModifierKeys -> IO ()
 keyCallback keyPress close win Key'Right _ _ _ = keyPress $ Just GoRight
