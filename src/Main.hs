@@ -11,10 +11,16 @@ import Control.Concurrent (threadDelay)
 import Data.Maybe (fromJust)
 
 
+data GameState = Menu | Level Int
+data Lifeform = Lifeform (Vector2 GLdouble) Species LifeStatus
+data LifeStatus = Alive | Dead
+data Species = Grass
+
 -- initial player position
 playerPos0 = Vector2 200 200
 playerWidth = 20 
-playerHeight = (20 :: GLdouble)
+playerHeight = (50 :: GLdouble)
+grassSize = (32 :: GLdouble)
 
 windowCloseCallback closed window = do writeIORef closed True
                                        return ()
@@ -87,6 +93,8 @@ resetTime :: IO ()
 resetTime =
     setTime (0 :: Double)
 
+-- major refactor needed soon
+
 drawBackground :: (GLdouble, GLdouble) -> Maybe TextureObject -> IO ()
 drawBackground (width, height) mbTexture = do
                             texture Texture2D $= Enabled
@@ -111,11 +119,22 @@ drawPlayer (Vector2 x y) = do
         color $ Color4 0 0 1.0 (1 :: GLfloat)
         loadIdentity
         renderPrimitive Quads $ do
-            vertex $ Vertex2 (x)             (y)
-            vertex $ Vertex2 (x+playerWidth) (y)
-            vertex $ Vertex2 (x+playerWidth) (y+playerHeight)
-            vertex $ Vertex2 (x)             (y+playerHeight)
+            vertex $ Vertex2 (x - playerWidth/2) (y - playerHeight/2)
+            vertex $ Vertex2 (x + playerWidth/2) (y - playerHeight/2)
+            vertex $ Vertex2 (x + playerWidth/2) (y + playerHeight/2)
+            vertex $ Vertex2 (x - playerWidth/2) (y + playerHeight/2)
 
+drawGrass (Vector2 x y) alive = do
+                                    case alive of
+                                        Dead -> color $ Color4 0.33 0.41 0.18 (1 :: GLfloat)
+                                        Alive -> color $ Color4 0 1.0 0 (1 :: GLfloat)
+                                    loadIdentity
+                                    renderPrimitive Quads $ do
+                                        vertex $ Vertex2 (x - grassSize) (y - grassSize)
+                                        vertex $ Vertex2 (x + grassSize) (y - grassSize)
+                                        vertex $ Vertex2 (x + grassSize) (y + grassSize)
+                                        vertex $ Vertex2 (x - grassSize) (y + grassSize)
+                                     
 
 renderLevel :: Maybe TextureObject -> Window -> (GLdouble, GLdouble) -> Vector2 GLdouble -> (Double, Double, Maybe Double) -> IO ()
 renderLevel mbBackground window windowSize playerPos (_,_,fps) = do 
@@ -124,6 +143,7 @@ renderLevel mbBackground window windowSize playerPos (_,_,fps) = do
                                                     Nothing -> return ()
                                                 clear [ColorBuffer, DepthBuffer]
                                                 drawBackground windowSize mbBackground
+                                                drawGrass (Vector2 300 300) Dead
                                                 drawPlayer playerPos
                                                 flush
                                                 swapBuffers window
