@@ -93,15 +93,6 @@ drawPlayer (Vector2 x y) = do
             vertex $ Vertex2 (x+playerWidth) (y+playerHeight)
             vertex $ Vertex2 (x)             (y+playerHeight)
 
-resizeGL :: ((GLdouble, GLdouble) -> IO()) -> Window -> Int -> Int -> IO()
-resizeGL windowSizeSink window w h = do
-                                         windowSizeSink ((fromIntegral w),(fromIntegral h))
-                                         viewport $= (Position 0 0, Size (fromIntegral w) (fromIntegral h))
-                                         matrixMode $= Projection
-                                         loadIdentity
-                                         ortho 0 (fromIntegral w) 0 (fromIntegral h) (-1) 1
-                                         matrixMode $= Modelview 0
-
 renderLevel :: Window -> Vector2 GLdouble -> (Double, Double, Maybe Double) -> IO ()
 renderLevel window playerPos (_,_,fps) = do 
                                                 case fps of

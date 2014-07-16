@@ -23,6 +23,15 @@ initGL width height = do
   ortho 0 (fromIntegral width) 0 (fromIntegral height) (-1) 1
   matrixMode $= Modelview 0
 
+resizeGL :: ((GLdouble, GLdouble) -> IO()) -> Window -> Int -> Int -> IO()
+resizeGL windowSizeSink window w h = do
+                                         windowSizeSink ((fromIntegral w),(fromIntegral h))
+                                         viewport $= (Position 0 0, Size (fromIntegral w) (fromIntegral h))
+                                         matrixMode $= Projection
+                                         loadIdentity
+                                         ortho 0 (fromIntegral w) 0 (fromIntegral h) (-1) 1
+                                         matrixMode $= Modelview 0
+
 withWindow :: Int -> Int -> String -> (GLFW.Window -> IO ()) -> IO ()
 withWindow width height title f = do
     GLFW.setErrorCallback $ Just simpleErrorCallback
