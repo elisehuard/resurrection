@@ -22,8 +22,9 @@ executable resurrection
   build-depends:       base >=4.7 && <4.8
                      , elerea
                      , OpenGL
-                     , GLUT
                      , GLFW-b
+                     , bitmap
+                     , stb-image
   hs-source-dirs:      src
   default-language:    Haskell2010
 
