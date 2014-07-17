@@ -15,11 +15,14 @@ data GameState = Menu | Level Int
 data Lifeform = Lifeform (Vector2 GLdouble) Species LifeStatus
 data LifeStatus = Alive | Dead
 data Species = Grass
+data Player = Player (Vector2 GLdouble) Direction
+data Direction = Neutral | GoBack | GoLeft | GoRight
 
 -- initial player position
 playerPos0 = Vector2 200 200
-playerWidth = 20 
-playerHeight = (50 :: GLdouble)
+initialPlayer = Player playerPos0 Neutral
+playerWidth = 60 
+playerHeight = (80 :: GLdouble)
 grassSize = (32 :: GLdouble)
 
 windowCloseCallback closed window = do writeIORef closed True
@@ -29,6 +32,7 @@ main :: IO ()
 main = do 
     let width  = 640
         height = 480
+        gameState = Menu
 
     (keyPress,keyPressSink) <- external Nothing
     (closeGame, closeGameSink) <- external False
@@ -41,25 +45,30 @@ main = do
           setWindowSizeCallback      win $ Just $ resizeGL windowSizeSink
 
           mbBackground <- loadTexture "images/rocks.jpg"
+          mbPlayerFront <- loadTexture "images/alien.png"
+          mbPlayerBack <- loadTexture "images/alien-back.png"
+          mbPlayerRight <- loadTexture "images/alien-right.png"
+          mbPlayerLeft <- loadTexture "images/alien-left.png"
+          let textures = [mbBackground, mbPlayerFront, mbPlayerBack, mbPlayerRight, mbPlayerLeft]
           -- All we need to get going is an IO-valued signal and an IO
           -- function to update the external signals
-          game <- start $ resurrection windowSize mbBackground win
+          game <- start $ resurrection windowSize textures win
           driveNetwork game (readInput win closed)
 
           -- The inevitable sad ending
           exitWith ExitSuccess
 
 -- TODO limits of the world - go round?
-updateFromKey :: Vector2 GLdouble -> (Bool, Bool, Bool, Bool) -> Vector2 GLdouble
-updateFromKey (Vector2 x y) keyP = case keyP of -- todo: all keys pressed considered?
-                                     (True, _, _, _)  -> Vector2 (x - 5) y
-                                     (_, True, _, _)   -> Vector2 x (y + 5)
-                                     (_, _, True, _)  -> Vector2 x (y - 5)
-                                     (_, _, _, True) -> Vector2 (x + 5) y
-                                     otherwise    -> Vector2 x y
+updateFromKey :: Player -> (Bool, Bool, Bool, Bool) -> Player
+updateFromKey (Player (Vector2 x y) _) keyP = case keyP of -- todo: all keys pressed considered?
+                                     (True, _, _, _)  -> Player (Vector2 (x - 5) y) GoLeft
+                                     (_, True, _, _)   -> Player (Vector2 x (y + 5)) GoBack
+                                     (_, _, True, _)  -> Player (Vector2 x (y - 5)) Neutral
+                                     (_, _, _, True) -> Player (Vector2 (x + 5) y) GoRight
+                                     otherwise    -> Player (Vector2 x y) Neutral
 
-resurrection :: Signal (GLdouble, GLdouble) -> Maybe TextureObject -> Window -> SignalGen Double (Signal (IO())) 
-resurrection windowSize mbBackground window  = do 
+resurrection :: Signal (GLdouble, GLdouble) -> [Maybe TextureObject] -> Window -> SignalGen Double (Signal (IO())) 
+resurrection windowSize textures window  = do 
                                               directionControl <- effectful $ (,,,)
                                                 <$> keyIsPressed window Key'Left
                                                 <*> keyIsPressed window Key'Up
@@ -71,10 +80,10 @@ resurrection windowSize mbBackground window  = do
                                                     in if done
                                                     then (0, 0, Just (count / time'))
                                                     else (time', count + 1, Nothing)
-                                              playerPos <- transfer playerPos0 (\dt keyP p -> updateFromKey p keyP) directionControl
+                                              player <- transfer initialPlayer (\dt keyP p -> updateFromKey p keyP) directionControl
                                               -- only happen once during game?
 
-                                              return $ (renderLevel mbBackground window) <$> windowSize <*> playerPos <*> fpsTracking
+                                              return $ (renderLevel textures window) <$> windowSize <*> player <*> fpsTracking
 
 
 readInput window closed = do
@@ -102,26 +111,32 @@ drawBackground (width, height) mbTexture = do
                             textureBinding Texture2D $= mbTexture
                             loadIdentity
                             renderPrimitive Quads $ do
-                                vertex $ Vertex2 (0 :: GLdouble) 0
                                 toTexture (0, 0) 
-                                vertex $ Vertex2 width           0
+                                vertex $ Vertex2 (0 :: GLdouble) 0
                                 toTexture (1, 0)
-                                vertex $ Vertex2 width           height
+                                vertex $ Vertex2 width           0
                                 toTexture (1, 1)
-                                vertex $ Vertex2 0               height
+                                vertex $ Vertex2 width           height
                                 toTexture (0, 1)
+                                vertex $ Vertex2 0               height
                             texture Texture2D $= Disabled
 
 toTexture (x,y) = texCoord2f (TexCoord2 x y)
                 where texCoord2f = texCoord :: TexCoord2 GLfloat -> IO ()
 
-drawPlayer (Vector2 x y) = do
-        color $ Color4 0 0 1.0 (1 :: GLfloat)
+drawPlayer (Vector2 x y) mbTexture = do
+        texture Texture2D $= Enabled
+        textureFunction $= Replace
+        textureBinding Texture2D $= mbTexture
         loadIdentity
         renderPrimitive Quads $ do
+            toTexture (0,1)
             vertex $ Vertex2 (x - playerWidth/2) (y - playerHeight/2)
+            toTexture (1,1)
             vertex $ Vertex2 (x + playerWidth/2) (y - playerHeight/2)
+            toTexture (1,0)
             vertex $ Vertex2 (x + playerWidth/2) (y + playerHeight/2)
+            toTexture (0,0)
             vertex $ Vertex2 (x - playerWidth/2) (y + playerHeight/2)
 
 drawGrass (Vector2 x y) alive = do
@@ -136,15 +151,20 @@ drawGrass (Vector2 x y) alive = do
                                         vertex $ Vertex2 (x - grassSize) (y + grassSize)
                                      
 
-renderLevel :: Maybe TextureObject -> Window -> (GLdouble, GLdouble) -> Vector2 GLdouble -> (Double, Double, Maybe Double) -> IO ()
-renderLevel mbBackground window windowSize playerPos (_,_,fps) = do 
+renderLevel :: [Maybe TextureObject] -> Window -> (GLdouble, GLdouble) -> Player -> (Double, Double, Maybe Double) -> IO ()
+renderLevel textures window windowSize (Player playerPos direction) (_,_,fps) = do 
                                                 case fps of
                                                     Just value -> putStrLn $ "FPS: " ++ show value
                                                     Nothing -> return ()
                                                 clear [ColorBuffer, DepthBuffer]
-                                                drawBackground windowSize mbBackground
+                                                drawBackground windowSize (head textures)
                                                 drawGrass (Vector2 300 300) Dead
-                                                drawPlayer playerPos
+                                                case direction of
+                                                   Neutral -> drawPlayer playerPos (textures !! 1)
+                                                   GoBack -> drawPlayer playerPos (textures !! 2)
+                                                   GoRight -> drawPlayer playerPos (textures !! 3)
+                                                   GoLeft -> drawPlayer playerPos (textures !! 4)
+                                                   otherwise -> error "unknown direction?"
                                                 flush
                                                 swapBuffers window
                                                 pollEvents -- Necessary for it not to freeze.
