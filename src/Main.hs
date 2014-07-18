@@ -1,5 +1,6 @@
 {-# LANGUAGE PackageImports #-}
 import Control.Applicative hiding (Const)
+import Resurrection.Types
 import Resurrection.FRP
 import Resurrection.Graphics
 import Data.IORef
@@ -10,20 +11,9 @@ import "GLFW-b" Graphics.UI.GLFW as GLFW
 import Control.Concurrent (threadDelay)
 import Data.Maybe (fromJust)
 
-
-data GameState = Menu | Level Int
-data Lifeform = Lifeform (Vector2 GLdouble) Species LifeStatus
-data LifeStatus = Alive | Dead
-data Species = Grass
-data Player = Player (Vector2 GLdouble) Direction
-data Direction = Neutral | GoBack | GoLeft | GoRight
-
 -- initial player position
 playerPos0 = Vector2 200 200
 initialPlayer = Player playerPos0 Neutral
-playerWidth = 60 
-playerHeight = (80 :: GLdouble)
-grassSize = (32 :: GLdouble)
 
 windowCloseCallback closed window = do writeIORef closed True
                                        return ()
@@ -44,12 +34,10 @@ main = do
           setWindowCloseCallback     win $ Just $ windowCloseCallback closed
           setWindowSizeCallback      win $ Just $ resizeGL windowSizeSink
 
-          mbBackground <- loadTexture "images/rocks.jpg"
-          mbPlayerFront <- loadTexture "images/alien.png"
-          mbPlayerBack <- loadTexture "images/alien-back.png"
-          mbPlayerRight <- loadTexture "images/alien-right.png"
-          mbPlayerLeft <- loadTexture "images/alien-left.png"
-          let textures = [mbBackground, mbPlayerFront, mbPlayerBack, mbPlayerRight, mbPlayerLeft]
+          -- player grass levelbackground
+          
+          textures <- loadTextures
+
           -- All we need to get going is an IO-valued signal and an IO
           -- function to update the external signals
           game <- start $ resurrection windowSize textures win
@@ -67,7 +55,7 @@ updateFromKey (Player (Vector2 x y) _) keyP = case keyP of -- todo: all keys pre
                                      (_, _, _, True) -> Player (Vector2 (x + 5) y) GoRight
                                      otherwise    -> Player (Vector2 x y) Neutral
 
-resurrection :: Signal (GLdouble, GLdouble) -> [Maybe TextureObject] -> Window -> SignalGen Double (Signal (IO())) 
+resurrection :: Signal (GLdouble, GLdouble) -> Textures -> Window -> SignalGen Double (Signal (IO())) 
 resurrection windowSize textures window  = do 
                                               directionControl <- effectful $ (,,,)
                                                 <$> keyIsPressed window Key'Left
@@ -104,67 +92,16 @@ resetTime =
 
 -- major refactor needed soon
 
-drawBackground :: (GLdouble, GLdouble) -> Maybe TextureObject -> IO ()
-drawBackground (width, height) mbTexture = do
-                            texture Texture2D $= Enabled
-                            textureFunction $= Replace
-                            textureBinding Texture2D $= mbTexture
-                            loadIdentity
-                            renderPrimitive Quads $ do
-                                toTexture (0, 0) 
-                                vertex $ Vertex2 (0 :: GLdouble) 0
-                                toTexture (1, 0)
-                                vertex $ Vertex2 width           0
-                                toTexture (1, 1)
-                                vertex $ Vertex2 width           height
-                                toTexture (0, 1)
-                                vertex $ Vertex2 0               height
-                            texture Texture2D $= Disabled
-
-toTexture (x,y) = texCoord2f (TexCoord2 x y)
-                where texCoord2f = texCoord :: TexCoord2 GLfloat -> IO ()
-
-drawPlayer (Vector2 x y) mbTexture = do
-        texture Texture2D $= Enabled
-        textureFunction $= Replace
-        textureBinding Texture2D $= mbTexture
-        loadIdentity
-        renderPrimitive Quads $ do
-            toTexture (0,1)
-            vertex $ Vertex2 (x - playerWidth/2) (y - playerHeight/2)
-            toTexture (1,1)
-            vertex $ Vertex2 (x + playerWidth/2) (y - playerHeight/2)
-            toTexture (1,0)
-            vertex $ Vertex2 (x + playerWidth/2) (y + playerHeight/2)
-            toTexture (0,0)
-            vertex $ Vertex2 (x - playerWidth/2) (y + playerHeight/2)
-
-drawGrass (Vector2 x y) alive = do
-                                    case alive of
-                                        Dead -> color $ Color4 0.33 0.41 0.18 (1 :: GLfloat)
-                                        Alive -> color $ Color4 0 1.0 0 (1 :: GLfloat)
-                                    loadIdentity
-                                    renderPrimitive Quads $ do
-                                        vertex $ Vertex2 (x - grassSize) (y - grassSize)
-                                        vertex $ Vertex2 (x + grassSize) (y - grassSize)
-                                        vertex $ Vertex2 (x + grassSize) (y + grassSize)
-                                        vertex $ Vertex2 (x - grassSize) (y + grassSize)
-                                     
-
-renderLevel :: [Maybe TextureObject] -> Window -> (GLdouble, GLdouble) -> Player -> (Double, Double, Maybe Double) -> IO ()
-renderLevel textures window windowSize (Player playerPos direction) (_,_,fps) = do 
+renderLevel :: Textures -> Window -> (GLdouble, GLdouble) -> Player -> (Double, Double, Maybe Double) -> IO ()
+renderLevel textures window windowSize player (_,_,fps) = do 
                                                 case fps of
                                                     Just value -> putStrLn $ "FPS: " ++ show value
                                                     Nothing -> return ()
                                                 clear [ColorBuffer, DepthBuffer]
-                                                drawBackground windowSize (head textures)
-                                                drawGrass (Vector2 300 300) Dead
-                                                case direction of
-                                                   Neutral -> drawPlayer playerPos (textures !! 1)
-                                                   GoBack -> drawPlayer playerPos (textures !! 2)
-                                                   GoRight -> drawPlayer playerPos (textures !! 3)
-                                                   GoLeft -> drawPlayer playerPos (textures !! 4)
-                                                   otherwise -> error "unknown direction?"
+                                                let background = Background (Level 1) windowSize
+                                                draw background (backgroundTexture background textures)
+                                                draw (Lifeform (Vector2 300 300) Grass Dead) Nothing
+                                                draw player (playerTexture player textures)
                                                 flush
                                                 swapBuffers window
                                                 pollEvents -- Necessary for it not to freeze.

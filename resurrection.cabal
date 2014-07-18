@@ -25,6 +25,8 @@ executable resurrection
                      , GLFW-b
                      , bitmap
                      , stb-image
+                     , containers
+                     , mtl
   hs-source-dirs:      src
   default-language:    Haskell2010
 

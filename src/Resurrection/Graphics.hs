@@ -1,15 +1,27 @@
 {-# LANGUAGE PackageImports #-}
 module Resurrection.Graphics
-(withWindow, initGL, resizeGL, loadTexture)
+(withWindow, initGL, resizeGL, loadTexture, toTexture, loadTextures, playerTexture, backgroundTexture)
 where
 
 import Graphics.Rendering.OpenGL
 import "GLFW-b" Graphics.UI.GLFW as GLFW
 import FRP.Elerea.Param
 import Control.Monad (when)
+import Control.Monad.Reader
+import Data.Maybe (fromJust)
 import Data.Bitmap.Pure
 import Foreign.Ptr (castPtr)
 import Codec.Image.STB (loadImage)
+import qualified Data.Map.Strict as Map
+import Resurrection.Types
+
+-- constants
+
+playerWidth = 60 
+playerHeight = (80 :: GLdouble)
+grassSize = (32 :: GLdouble)
+
+-- general opengl functions
 
 initGL width height = do
   clearColor $= Color4 0 0 0 1
@@ -32,6 +44,9 @@ resizeGL windowSizeSink window w h = do
                                          ortho 0 (fromIntegral w) 0 (fromIntegral h) (-1) 1
                                          matrixMode $= Modelview 0
 
+
+-- GLFW boilerplate
+
 withWindow :: Int -> Int -> String -> (GLFW.Window -> IO ()) -> IO ()
 withWindow width height title f = do
     GLFW.setErrorCallback $ Just simpleErrorCallback
@@ -49,6 +64,8 @@ withWindow width height title f = do
   where
     simpleErrorCallback e s =
         putStrLn $ unwords [show e, show s]
+
+-- textures
 
 compileTexture2D :: Bool -> Bool -> Bitmap Word8 -> IO (Maybe TextureObject)
 compileTexture2D isMip isClamped bitmap = do
@@ -80,3 +97,72 @@ loadTexture path = do
     Right img <- loadImage path
     mbTexName <- compileTexture2D False True img
     return mbTexName
+
+loadTextures :: IO Textures
+loadTextures = do 
+                  loaded <- mapM loadTexture ["images/rocks.jpg", "images/alien.png", "images/alien-back.png", "images/alien-right.png", "images/alien-left.png"]
+                  let names = ["level-1", "alien-neutral", "alien-back", "alien-right", "alien-left"] 
+                      list  = zip names loaded
+                  return $ Map.fromList list
+
+lookupTexture :: String -> Textures -> Maybe TextureObject
+lookupTexture name textures = fromJust (Map.lookup name textures)
+
+toTexture (x,y) = texCoord2f (TexCoord2 x y)
+                where texCoord2f = texCoord :: TexCoord2 GLfloat -> IO ()
+
+-- draw individual components
+
+--textureName :: (Draw a) => a -> String
+playerTexture (Player _ Neutral)   = lookupTexture "alien-neutral"
+playerTexture (Player _ GoBack)    = lookupTexture "alien-back"
+playerTexture (Player _ GoRight)   = lookupTexture "alien-right"
+playerTexture (Player _ GoLeft)    = lookupTexture "alien-left"
+backgroundTexture (Background _ _) = lookupTexture "level-1"
+
+instance Draw Player where
+  draw (Player (Vector2 x y) direction) mbTexture = do
+                                                texture Texture2D $= Enabled
+                                                textureFunction $= Replace
+                                                textureBinding Texture2D $= mbTexture
+                                                loadIdentity
+                                                renderPrimitive Quads $ do
+                                                    toTexture (0,1)
+                                                    vertex $ Vertex2 (x - playerWidth/2) (y - playerHeight/2)
+                                                    toTexture (1,1)
+                                                    vertex $ Vertex2 (x + playerWidth/2) (y - playerHeight/2)
+                                                    toTexture (1,0)
+                                                    vertex $ Vertex2 (x + playerWidth/2) (y + playerHeight/2)
+                                                    toTexture (0,0)
+                                                    vertex $ Vertex2 (x - playerWidth/2) (y + playerHeight/2)
+                                                texture Texture2D $= Disabled
+
+instance Draw Lifeform where
+  draw (Lifeform (Vector2 x y) Grass alive) Nothing = do
+                                    case alive of
+                                        Dead -> color $ Color4 0.33 0.41 0.18 (1 :: GLfloat)
+                                        Alive -> color $ Color4 0 1.0 0 (1 :: GLfloat)
+                                    loadIdentity
+                                    renderPrimitive Quads $ do
+                                        vertex $ Vertex2 (x - grassSize) (y - grassSize)
+                                        vertex $ Vertex2 (x + grassSize) (y - grassSize)
+                                        vertex $ Vertex2 (x + grassSize) (y + grassSize)
+                                        vertex $ Vertex2 (x - grassSize) (y + grassSize)
+  draw _ _ = error "what here?"
+
+instance Draw Background where
+  draw (Background (Level 1) (width, height)) mbTexture = do
+                            texture Texture2D $= Enabled
+                            textureFunction $= Replace
+                            textureBinding Texture2D $= mbTexture
+                            loadIdentity
+                            renderPrimitive Quads $ do
+                                toTexture (0, 0) 
+                                vertex $ Vertex2 (0 :: GLdouble) 0
+                                toTexture (1, 0)
+                                vertex $ Vertex2 width           0
+                                toTexture (1, 1)
+                                vertex $ Vertex2 width           height
+                                toTexture (0, 1)
+                                vertex $ Vertex2 0               height
+                            texture Texture2D $= Disabled
