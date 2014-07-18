@@ -86,12 +86,6 @@ readInput window closed = do
 
     return $ if k || c || (t == Nothing) then Nothing else Just (realToFrac (fromJust t))
 
-resetTime :: IO ()
-resetTime =
-    setTime (0 :: Double)
-
--- major refactor needed soon
-
 renderLevel :: Textures -> Window -> (GLdouble, GLdouble) -> Player -> (Double, Double, Maybe Double) -> IO ()
 renderLevel textures window windowSize player (_,_,fps) = do 
                                                 case fps of
@@ -105,11 +99,3 @@ renderLevel textures window windowSize player (_,_,fps) = do
                                                 flush
                                                 swapBuffers window
                                                 pollEvents -- Necessary for it not to freeze.
-
-isPress :: KeyState -> Bool
-isPress KeyState'Pressed   = True
-isPress KeyState'Repeating = True
-isPress _                       = False
-
-keyIsPressed :: Window -> Key -> IO Bool
-keyIsPressed win key = isPress `fmap` GLFW.getKey win key

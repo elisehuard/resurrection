@@ -1,6 +1,15 @@
 {-# LANGUAGE PackageImports #-}
 module Resurrection.Graphics
-(withWindow, initGL, resizeGL, loadTexture, toTexture, loadTextures, playerTexture, backgroundTexture)
+( initGL
+, resizeGL
+, withWindow
+, keyIsPressed
+, resetTime
+, loadTexture
+, toTexture
+, loadTextures
+, playerTexture
+, backgroundTexture)
 where
 
 import Graphics.Rendering.OpenGL
@@ -64,6 +73,18 @@ withWindow width height title f = do
   where
     simpleErrorCallback e s =
         putStrLn $ unwords [show e, show s]
+
+isPress :: KeyState -> Bool
+isPress KeyState'Pressed   = True
+isPress KeyState'Repeating = True
+isPress _                       = False
+
+keyIsPressed :: Window -> Key -> IO Bool
+keyIsPressed win key = isPress `fmap` GLFW.getKey win key
+
+resetTime :: IO ()
+resetTime =
+    setTime (0 :: Double)
 
 -- textures
 
