@@ -9,7 +9,8 @@ module Resurrection.Graphics
 , toTexture
 , loadTextures
 , playerTexture
-, backgroundTexture)
+, backgroundTexture
+, colliding)
 where
 
 import Graphics.Rendering.OpenGL
@@ -143,48 +144,65 @@ playerTexture (Player _ GoLeft)    = lookupTexture "alien-left"
 backgroundTexture (Background _ _) = lookupTexture "level-1"
 
 instance Draw Player where
-  draw (Player (Vector2 x y) direction) mbTexture = do
-                                                texture Texture2D $= Enabled
-                                                textureFunction $= Replace
-                                                textureBinding Texture2D $= mbTexture
-                                                loadIdentity
-                                                renderPrimitive Quads $ do
-                                                    toTexture (0,1)
-                                                    vertex $ Vertex2 (x - playerWidth/2) (y - playerHeight/2)
-                                                    toTexture (1,1)
-                                                    vertex $ Vertex2 (x + playerWidth/2) (y - playerHeight/2)
-                                                    toTexture (1,0)
-                                                    vertex $ Vertex2 (x + playerWidth/2) (y + playerHeight/2)
-                                                    toTexture (0,0)
-                                                    vertex $ Vertex2 (x - playerWidth/2) (y + playerHeight/2)
-                                                texture Texture2D $= Disabled
+  draw player@(Player (Vector2 x y) direction) textures = do 
+                                                            let mbTexture = playerTexture player textures
+                                                            texture Texture2D $= Enabled
+                                                            textureFunction $= Replace
+                                                            textureBinding Texture2D $= mbTexture
+                                                            loadIdentity
+                                                            renderPrimitive Quads $ do
+                                                                toTexture (0,1)
+                                                                vertex $ Vertex2 (x - playerWidth/2) (y - playerHeight/2)
+                                                                toTexture (1,1)
+                                                                vertex $ Vertex2 (x + playerWidth/2) (y - playerHeight/2)
+                                                                toTexture (1,0)
+                                                                vertex $ Vertex2 (x + playerWidth/2) (y + playerHeight/2)
+                                                                toTexture (0,0)
+                                                                vertex $ Vertex2 (x - playerWidth/2) (y + playerHeight/2)
+                                                            texture Texture2D $= Disabled
 
 instance Draw Lifeform where
-  draw (Lifeform (Vector2 x y) Grass alive) Nothing = do
+  draw (Lifeform (Vector2 x y) Grass alive) _ = do
                                     case alive of
                                         Dead -> color $ Color4 0.33 0.41 0.18 (1 :: GLfloat)
-                                        Alive -> color $ Color4 0 1.0 0 (1 :: GLfloat)
+                                        Alive -> color $ Color4 0.4 1.0 0 (1 :: GLfloat)
                                     loadIdentity
                                     renderPrimitive Quads $ do
                                         vertex $ Vertex2 (x - grassSize) (y - grassSize)
                                         vertex $ Vertex2 (x + grassSize) (y - grassSize)
                                         vertex $ Vertex2 (x + grassSize) (y + grassSize)
                                         vertex $ Vertex2 (x - grassSize) (y + grassSize)
-  draw _ _ = error "what here?"
 
 instance Draw Background where
-  draw (Background (Level 1) (width, height)) mbTexture = do
-                            texture Texture2D $= Enabled
-                            textureFunction $= Replace
-                            textureBinding Texture2D $= mbTexture
-                            loadIdentity
-                            renderPrimitive Quads $ do
-                                toTexture (0, 0) 
-                                vertex $ Vertex2 (0 :: GLdouble) 0
-                                toTexture (1, 0)
-                                vertex $ Vertex2 width           0
-                                toTexture (1, 1)
-                                vertex $ Vertex2 width           height
-                                toTexture (0, 1)
-                                vertex $ Vertex2 0               height
-                            texture Texture2D $= Disabled
+  draw background@(Background _ (width, height)) textures = do  let mbTexture = backgroundTexture background textures
+                                                                texture Texture2D $= Enabled
+                                                                textureFunction $= Replace
+                                                                textureBinding Texture2D $= mbTexture
+                                                                loadIdentity
+                                                                renderPrimitive Quads $ do
+                                                                    toTexture (0, 0) 
+                                                                    vertex $ Vertex2 (0 :: GLdouble) 0
+                                                                    toTexture (1, 0)
+                                                                    vertex $ Vertex2 width           0
+                                                                    toTexture (1, 1)
+                                                                    vertex $ Vertex2 width           height
+                                                                    toTexture (0, 1)
+                                                                    vertex $ Vertex2 0               height
+                                                                texture Texture2D $= Disabled
+
+-- data World = World Background [Lifeform]
+instance Draw World where
+  draw (World background lifeforms) textures = do draw background textures
+                                                  mapM ((flip (draw)) textures) lifeforms
+                                                  return ()
+
+-- collision detection - is geometry graphics or not?
+-- player x - playerWidth/2 left edge
+-- grass x - grassSize
+-- 
+xcolliding (Lifeform (Vector2 g1 g2) Grass _) (Vector2 x y) = ((x - playerWidth/2)  > (g1 - grassSize) && (x - playerWidth/2) < (g1 + grassSize)) ||
+                                                              ((x + playerWidth/2) > (g1 - grassSize) && (x + playerWidth/2) < (g1 + grassSize))
+ycolliding (Lifeform (Vector2 g1 g2) Grass _) (Vector2 x y) = ((y - playerHeight/2)  > (g2 - grassSize) && (x - playerHeight/2) < (g2 + grassSize)) ||
+                                                              ((y + playerHeight/2) > (g2 - grassSize) && (x + playerHeight/2) < (g2 + grassSize))
+
+colliding lifeform position = xcolliding lifeform position && ycolliding lifeform position

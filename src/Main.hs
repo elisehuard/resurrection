@@ -10,11 +10,14 @@ import System.Exit ( exitWith, ExitCode(ExitSuccess), exitFailure)
 import "GLFW-b" Graphics.UI.GLFW as GLFW
 import Control.Concurrent (threadDelay)
 import Data.Maybe (fromJust)
+import Data.List (find)
+import Control.Monad.Reader
 import Debug.Trace
 
 -- initial player position
 playerPos0 = Vector2 200 200
 initialPlayer = Player playerPos0 Neutral
+initialWorld = World (Background (Level 1) (640, 480)) [Lifeform (Vector2 300 300) Grass Dead]
 
 windowCloseCallback closed window = do writeIORef closed True
                                        return ()
@@ -63,17 +66,32 @@ resurrection windowSize textures window  = do
                                                 <*> keyIsPressed window Key'Up
                                                 <*> keyIsPressed window Key'Down
                                                 <*> keyIsPressed window Key'Right
+                                              resurrectControl <- effectful $ keyIsPressed window Key'Space
                                               fpsTracking <- stateful (0, 0, Nothing) $ \dt (time, count, _) ->
                                                     let time' = time + dt
                                                         done = time > 5
                                                     in if done
                                                     then (0, 0, Just (count / time'))
                                                     else (time', count + 1, Nothing)
+
                                               player <- transfer initialPlayer (\dt keyP p -> updateFromKey p keyP) directionControl
-                                              -- only happen once during game?
+                                              -- state of the world
+                                              world <- transfer2 initialWorld (\dt p r w -> worldEvolution p r w) player resurrectControl
 
-                                              return $ (renderLevel textures window) <$> windowSize <*> player <*> fpsTracking
+                                              return $ (renderLevel textures window) <$> windowSize <*> world <*> player <*> fpsTracking
 
+
+-- if player stands on lifeform, and lifeform is dead, and they press space (for resurrect), then the lifeform resurrects
+-- todo next step: points accounting (lifeform cost + player life down)
+-- todo: evolution of the life going from player to thing + way to represent this (text first step?)
+worldEvolution (Player position _) True (World background lifeforms) = World background (resurrect lifeforms position)
+worldEvolution _                   False world                       = world
+
+resurrect lifeforms position = map (\lifeform -> resurrectColliding (colliding lifeform position) lifeform) lifeforms
+
+-- for now, but accounting will change this.
+resurrectColliding True (Lifeform pos species _) = Lifeform pos species Alive
+resurrectColliding False lifeform = lifeform
 
 readInput window closed = do
     -- threadDelay 0 -- to avoid continuous polling, normally 20ms by default (see elerea-examples)
@@ -87,16 +105,14 @@ readInput window closed = do
 
     return $ if k || c || (t == Nothing) then Nothing else Just (realToFrac (fromJust t))
 
-renderLevel :: Textures -> Window -> (GLdouble, GLdouble) -> Player -> (Double, Double, Maybe Double) -> IO ()
-renderLevel textures window windowSize player (_,_,fps) = do 
+renderLevel :: Textures -> Window -> (GLdouble, GLdouble) -> World -> Player -> (Double, Double, Maybe Double) -> IO ()
+renderLevel textures window windowSize world player (_,_,fps) = do 
                                                 case fps of
                                                     Just value -> putStrLn $ "FPS: " ++ show value
                                                     Nothing -> return ()
                                                 clear [ColorBuffer, DepthBuffer]
-                                                let background = Background (Level 1) windowSize
-                                                draw background (backgroundTexture background textures)
-                                                draw (Lifeform (Vector2 300 300) Grass Dead) Nothing
-                                                draw player (playerTexture player textures)
+                                                draw world textures
+                                                draw player textures
                                                 flush
                                                 swapBuffers window
                                                 pollEvents -- Necessary for it not to freeze.

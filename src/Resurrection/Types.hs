@@ -31,4 +31,4 @@ type Textures = Map.Map String (Maybe TextureObject)
 
 -- passing in textures as reader
 class Draw a where
-  draw :: a -> Maybe TextureObject -> IO ()
+  draw :: a -> Textures -> IO ()
