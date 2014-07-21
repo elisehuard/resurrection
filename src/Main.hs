@@ -10,6 +10,7 @@ import System.Exit ( exitWith, ExitCode(ExitSuccess), exitFailure)
 import "GLFW-b" Graphics.UI.GLFW as GLFW
 import Control.Concurrent (threadDelay)
 import Data.Maybe (fromJust)
+import Debug.Trace
 
 -- initial player position
 playerPos0 = Vector2 200 200

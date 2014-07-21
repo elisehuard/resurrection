@@ -23,6 +23,7 @@ import Foreign.Ptr (castPtr)
 import Codec.Image.STB (loadImage)
 import qualified Data.Map.Strict as Map
 import Resurrection.Types
+import Debug.Trace
 
 -- constants
 
