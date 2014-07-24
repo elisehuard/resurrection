@@ -7,15 +7,18 @@ import Control.Monad.Reader
 data GameState = Menu | Level Int
                  deriving Show
 
-data LifeStatus = Alive | Dead
+data LifeStatus = Alive | Dead | Resurrecting Int | Dying Int
                   deriving Show
+
+type Life = Int
 
 data Background = Background GameState (GLdouble, GLdouble)
                   deriving Show
 
 data Species = Grass
                deriving Show
-data Lifeform = Lifeform (Vector2 GLdouble) Species LifeStatus
+
+data Lifeform = Lifeform (Vector2 GLdouble) Species LifeStatus Life
                 deriving Show
 
 data World = World Background [Lifeform]

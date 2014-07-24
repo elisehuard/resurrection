@@ -10,10 +10,13 @@ module Resurrection.Graphics
 , loadTextures
 , playerTexture
 , backgroundTexture
+, renderLevel
 , colliding)
 where
 
+import Resurrection.Text
 import Graphics.Rendering.OpenGL
+import qualified Graphics.Rendering.FTGL as FTGL
 import "GLFW-b" Graphics.UI.GLFW as GLFW
 import FRP.Elerea.Param
 import Control.Monad (when)
@@ -35,7 +38,7 @@ grassSize = (32 :: GLdouble)
 -- general opengl functions
 
 initGL width height = do
-  clearColor $= Color4 0 0 0 1
+  clearColor $= Color4 1 1 1 1
   blend $= Enabled
   blendFunc $= (SrcAlpha,OneMinusSrcAlpha)
   cullFace $= Just Back
@@ -162,7 +165,7 @@ instance Draw Player where
                                                             texture Texture2D $= Disabled
 
 instance Draw Lifeform where
-  draw (Lifeform (Vector2 x y) Grass alive) _ = do
+  draw (Lifeform (Vector2 x y) Grass alive _) _ = do
                                     case alive of
                                         Dead -> color $ Color4 0.33 0.41 0.18 (1 :: GLfloat)
                                         Alive -> color $ Color4 0.4 1.0 0 (1 :: GLfloat)
@@ -193,16 +196,31 @@ instance Draw Background where
 -- data World = World Background [Lifeform]
 instance Draw World where
   draw (World background lifeforms) textures = do draw background textures
-                                                  mapM ((flip (draw)) textures) lifeforms
+                                                  mapM ((flip draw) textures) lifeforms
                                                   return ()
 
 -- collision detection - is geometry graphics or not?
 -- player x - playerWidth/2 left edge
 -- grass x - grassSize
 -- 
-xcolliding (Lifeform (Vector2 g1 g2) Grass _) (Vector2 x y) = ((x - playerWidth/2)  > (g1 - grassSize) && (x - playerWidth/2) < (g1 + grassSize)) ||
+-- todo: define shape type and collisions between several types of shape, instead of between player and lifeform
+xcolliding (Lifeform (Vector2 g1 g2) Grass _ _) (Vector2 x y) = ((x - playerWidth/2)  > (g1 - grassSize) && (x - playerWidth/2) < (g1 + grassSize)) ||
                                                               ((x + playerWidth/2) > (g1 - grassSize) && (x + playerWidth/2) < (g1 + grassSize))
-ycolliding (Lifeform (Vector2 g1 g2) Grass _) (Vector2 x y) = ((y - playerHeight/2)  > (g2 - grassSize) && (x - playerHeight/2) < (g2 + grassSize)) ||
+ycolliding (Lifeform (Vector2 g1 g2) Grass _ _) (Vector2 x y) = ((y - playerHeight/2)  > (g2 - grassSize) && (x - playerHeight/2) < (g2 + grassSize)) ||
                                                               ((y + playerHeight/2) > (g2 - grassSize) && (x + playerHeight/2) < (g2 + grassSize))
 
 colliding lifeform position = xcolliding lifeform position && ycolliding lifeform position
+
+-- the actual rendering
+renderLevel :: Textures -> FTGL.Font -> Window -> (GLdouble, GLdouble) -> World -> Player -> Life -> (Double, Double, Maybe Double) -> IO ()
+renderLevel textures font window windowSize world player life (_,_,fps) = do 
+                                                case fps of
+                                                    Just value -> putStrLn $ "FPS: " ++ show value
+                                                    Nothing -> return ()
+                                                clear [ColorBuffer, DepthBuffer]
+                                                draw world textures
+                                                draw player textures
+                                                printText font windowSize (Vertex2 (-200) 200) $ show life
+                                                flush
+                                                swapBuffers window
+                                                pollEvents -- Necessary for it not to freeze.
