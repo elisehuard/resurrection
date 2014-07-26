@@ -4,28 +4,33 @@ module Resurrection.Game where
 import FRP.Elerea.Param
 import Resurrection.Types
 import Resurrection.Graphics
-import Graphics.Rendering.OpenGL
-import Graphics.Rendering.FTGL
+import Graphics.Rendering.OpenGL hiding (Front)
+import qualified Graphics.Rendering.FTGL as FTGL
 import Control.Applicative hiding (Const)
 import "GLFW-b" Graphics.UI.GLFW as GLFW
 import Debug.Trace
 
 -- initial player position
 playerPos0 = Vector2 200 200
-initialPlayer = Player playerPos0 Neutral
+initialPlayer = Player { pos = playerPos0, direction = Front, action = Neutral, tick =  0 }
 initialWorld = World (Background (Level 1) (640, 480)) [Lifeform (Vector2 300 300) Grass Dead 5]
 initialLife = 20
 
 -- TODO limits of the world - go round?
 updateFromKey :: Player -> (Bool, Bool, Bool, Bool) -> Player
-updateFromKey (Player (Vector2 x y) _) keyP = case keyP of -- todo: all keys pressed considered?
-                                     (True, _, _, _)  -> Player (Vector2 (x - 5) y) GoLeft
-                                     (_, True, _, _)   -> Player (Vector2 x (y + 5)) GoBack
-                                     (_, _, True, _)  -> Player (Vector2 x (y - 5)) Neutral
-                                     (_, _, _, True) -> Player (Vector2 (x + 5) y) GoRight
-                                     otherwise    -> Player (Vector2 x y) Neutral
+updateFromKey (Player (Vector2 x y) _ _ t) keyP = do let newTick = oscillating t
+                                                     case keyP of -- todo: all keys pressed considered?
+                                                         (True, _, _, _)  -> Player (Vector2 (x - 5) y) GoLeft Walking newTick
+                                                         (_, True, _, _)   -> Player (Vector2 x (y + 5)) GoBack Walking newTick
+                                                         (_, _, True, _)  -> Player (Vector2 x (y - 5)) Front Walking newTick
+                                                         (_, _, _, True) -> Player (Vector2 (x + 5) y) GoRight Walking newTick
+                                                         otherwise    -> Player (Vector2 x y) Front Neutral newTick
 
-resurrection :: Signal (GLdouble, GLdouble) -> Textures -> Font -> Window -> SignalGen Double (Signal (IO())) 
+oscillating t
+           | t == 2*pi  = 0
+           | otherwise = t + pi/6
+
+resurrection :: Signal (GLdouble, GLdouble) -> Textures -> FTGL.Font -> Window -> SignalGen Double (Signal (IO())) 
 resurrection windowSize textures font window  = mdo 
                                               directionControl <- effectful $ (,,,)
                                                 <$> keyIsPressed window Key'Left
@@ -64,15 +69,14 @@ resurrection windowSize textures font window  = mdo
 
 -- signal only pops up value when starting resurrection of a lifeform
 
-resurrecting dt (Player position _) True (World _ lifeforms) (False, previousResurrect) = (True, resurrectScope lifeforms position)
-resurrecting dt (Player position _) True (World _ lifeforms) (True, previousResurrect) = (True, [])
+resurrecting dt (Player position _ _ _) True (World _ lifeforms) (False, previousResurrect) = (True, resurrectScope lifeforms position)
+resurrecting dt (Player position _ _ _) True (World _ lifeforms) (True, previousResurrect) = (True, [])
 resurrecting dt _                   False _                  _ = (False, [])
 
 tally lifeforms = foldr addLifeformCost 0 lifeforms
 
 addLifeformCost (Lifeform _ _ _ cost) currentCount = currentCount + cost
 
-lifeAccounting a b c | trace ("accounting" ++ show b ) False = undefined
 lifeAccounting dt (True, resurrections) currentLife = currentLife - (tally resurrections)
 lifeAccounting dt (False, resurrections) currentLife = currentLife - (tally resurrections)
 
@@ -87,7 +91,7 @@ dead (Lifeform _ _ _    _) = False
 -- if player stands on lifeform, and lifeform is dead, and they press space (for resurrect), then the lifeform resurrects
 -- todo next step: points accounting (lifeform cost + player life down)
 -- todo: evolution of the life going from player to thing + way to represent this (text first step?)
-worldEvolution dt (Player position _) True (World background lifeforms) = World background (resurrect dt lifeforms position)
+worldEvolution dt (Player position _ _ _) True (World background lifeforms) = World background (resurrect dt lifeforms position)
 worldEvolution dt _                   False world                       = world
 
 resurrect dt lifeforms position = map (\lifeform -> resurrectColliding (colliding lifeform position) lifeform) lifeforms

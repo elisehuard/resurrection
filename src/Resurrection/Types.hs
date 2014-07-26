@@ -24,11 +24,19 @@ data Lifeform = Lifeform (Vector2 GLdouble) Species LifeStatus Life
 data World = World Background [Lifeform]
              deriving Show
 
-data Player = Player (Vector2 GLdouble) Direction
+data Player = Player {
+                pos :: Vector2 GLdouble,
+                direction :: Direction,
+                action :: Action,
+                tick :: Double
+              }
               deriving Show
 
-data Direction = Neutral | GoBack | GoLeft | GoRight
+data Direction = Front | GoBack | GoLeft | GoRight
                  deriving Show
+
+data Action = Neutral | Walking
+              deriving Show
 
 type Textures = Map.Map String (Maybe TextureObject)
 

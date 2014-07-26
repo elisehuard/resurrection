@@ -15,7 +15,7 @@ module Resurrection.Graphics
 where
 
 import Resurrection.Text
-import Graphics.Rendering.OpenGL
+import Graphics.Rendering.OpenGL hiding (Front)
 import qualified Graphics.Rendering.FTGL as FTGL
 import "GLFW-b" Graphics.UI.GLFW as GLFW
 import FRP.Elerea.Param
@@ -34,6 +34,7 @@ import Debug.Trace
 playerWidth = 60 
 playerHeight = (80 :: GLdouble)
 grassSize = (32 :: GLdouble)
+legSize = 15
 
 -- general opengl functions
 
@@ -126,8 +127,8 @@ loadTexture path = do
 
 loadTextures :: IO Textures
 loadTextures = do 
-                  loaded <- mapM loadTexture ["images/rocks.jpg", "images/alien.png", "images/alien-back.png", "images/alien-right.png", "images/alien-left.png"]
-                  let names = ["level-1", "alien-neutral", "alien-back", "alien-right", "alien-left"] 
+                  loaded <- mapM loadTexture ["images/rocks.jpg", "images/alien.png", "images/alien-back.png", "images/alien-right.png", "images/alien-left.png", "images/alien-body.png", "images/alien-leg.png"]
+                  let names = ["level-1", "alien-front", "alien-back", "alien-right", "alien-left", "alien-body", "alien-leg"] 
                       list  = zip names loaded
                   return $ Map.fromList list
 
@@ -140,18 +141,26 @@ toTexture (x,y) = texCoord2f (TexCoord2 x y)
 -- draw individual components
 
 --textureName :: (Draw a) => a -> String
-playerTexture (Player _ Neutral)   = lookupTexture "alien-neutral"
-playerTexture (Player _ GoBack)    = lookupTexture "alien-back"
-playerTexture (Player _ GoRight)   = lookupTexture "alien-right"
-playerTexture (Player _ GoLeft)    = lookupTexture "alien-left"
+playerTexture (Player {direction = Front})   = lookupTexture "alien-front"
+playerTexture (Player {direction = GoBack})    = lookupTexture "alien-back"
+playerTexture (Player {direction = GoRight})   = lookupTexture "alien-right"
+playerTexture (Player {direction = GoLeft})    = lookupTexture "alien-left"
 backgroundTexture (Background _ _) = lookupTexture "level-1"
 
+bodyTexture = lookupTexture "alien-body"
+legTexture = lookupTexture "alien-leg"
+
 instance Draw Player where
-  draw player@(Player (Vector2 x y) direction) textures = do 
-                                                            let mbTexture = playerTexture player textures
+   draw player textures = do 
+                            loadIdentity
+                            drawLeftLeg player (legTexture textures)
+                            drawRightLeg player (legTexture textures)
+                            drawBody player (bodyTexture textures)
+
+drawBody (Player (Vector2 x y) direction _ _) bodyTexture = do 
                                                             texture Texture2D $= Enabled
                                                             textureFunction $= Replace
-                                                            textureBinding Texture2D $= mbTexture
+                                                            textureBinding Texture2D $= bodyTexture
                                                             loadIdentity
                                                             renderPrimitive Quads $ do
                                                                 toTexture (0,1)
@@ -163,6 +172,55 @@ instance Draw Player where
                                                                 toTexture (0,0)
                                                                 vertex $ Vertex2 (x - playerWidth/2) (y + playerHeight/2)
                                                             texture Texture2D $= Disabled
+
+
+drawLeftLeg (Player (Vector2 x y) direction Neutral tick) legTexture = drawLeg (x - playerWidth/2 + 10) (y - playerHeight/2) 0 0 legTexture
+drawLeftLeg (Player (Vector2 x y) Front Walking tick) legTexture = do 
+                                                        let animy = realToFrac $ sin tick
+                                                        drawLeg (x - playerWidth/2 + 10) (y - playerHeight/2) 0 animy legTexture
+drawLeftLeg (Player (Vector2 x y) GoRight Walking tick) legTexture = do 
+                                                        let animx = realToFrac $ sin tick
+                                                        drawLeg (x - 5) (y - playerHeight/2) animx 0 legTexture
+drawLeftLeg (Player (Vector2 x y) GoLeft Walking tick) legTexture = do 
+                                                        let animx = realToFrac $ sin tick
+                                                        drawLeg (x - 15) (y - playerHeight/2) animx 0 legTexture
+drawLeftLeg (Player (Vector2 x y) GoBack Walking tick) legTexture = do 
+                                                        let animy = realToFrac $ sin tick
+                                                        drawLeg (x - playerWidth/2 + 10) (y - playerHeight/2) 0 animy legTexture
+
+drawRightLeg (Player (Vector2 x y) direction Neutral tick) legTexture =  drawLeg (x + playerWidth/2 - 30) (y - playerHeight/2) 0 0 legTexture
+
+drawRightLeg (Player (Vector2 x y) Front Walking tick) legTexture = do 
+                                                        let animy = realToFrac $ cos tick
+                                                        drawLeg x (y - playerHeight/2) 0 animy legTexture
+drawRightLeg (Player (Vector2 x y) GoRight Walking tick) legTexture = do 
+                                                        let animx = realToFrac $ cos tick
+                                                        drawLeg (x - 5) (y - playerHeight/2) animx 0 legTexture
+drawRightLeg (Player (Vector2 x y) GoLeft Walking tick) legTexture = do 
+                                                        let animx = realToFrac $ cos tick
+                                                        drawLeg (x - 15) (y - playerHeight/2) animx 0 legTexture
+drawRightLeg (Player (Vector2 x y) GoBack Walking tick) legTexture = do 
+                                                        let animy = realToFrac $ cos tick
+                                                        drawLeg x (y - playerHeight/2) 0 animy legTexture
+drawLeg x y animx animy legTexture = do 
+                                    let amplitudeX = 10
+                                        amplitudeY = 5
+                                    texture Texture2D $= Enabled
+                                    textureFunction $= Replace
+                                    textureBinding Texture2D $= legTexture
+                                    loadIdentity
+                                    renderPrimitive Quads $ do
+                                                toTexture (0,1)
+                                                vertex $ Vertex2 (x + animx*amplitudeX) (y - legSize/2 + animy*amplitudeY)
+                                                toTexture (1,1)
+                                                vertex $ Vertex2 (x + 20 + animx*amplitudeX) (y - legSize/2 + animy*amplitudeY)
+                                                toTexture (1,0)
+                                                vertex $ Vertex2 (x + 20 + animx*amplitudeX) (y + legSize/2 + animy*amplitudeY)
+                                                toTexture (0,0)
+                                                vertex $ Vertex2 (x + animx*amplitudeX) (y + legSize/2 + animy*amplitudeY)
+                                    preservingMatrix $ do
+                                        translate (Vector3 0 (-20) (0 :: GLdouble))
+                                    texture Texture2D $= Disabled
 
 instance Draw Lifeform where
   draw (Lifeform (Vector2 x y) Grass alive _) _ = do
