@@ -36,9 +36,9 @@ main = do
           setWindowSizeCallback      win $ Just $ resizeGL windowSizeSink
 
           -- player grass levelbackground
-          
+
           textures <- loadTextures
-          font <- loadFont "fonts/DroidSans.ttf"
+          font <- loadFont "fonts/Sketch_Block.ttf"
 
           -- All we need to get going is an IO-valued signal and an IO
           -- function to update the external signals
