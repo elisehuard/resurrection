@@ -38,6 +38,7 @@ resurrection windowSize textures font window  = mdo
                                                 <*> keyIsPressed window Key'Down
                                                 <*> keyIsPressed window Key'Right
                                               resurrectControl <- effectful $ keyIsPressed window Key'Space
+                                              killControl <- effectful $ keyIsPressed window Key'K
                                               fpsTracking <- stateful (0, 0, Nothing) $ \dt (time, count, _) ->
                                                     let time' = time + dt
                                                         done = time > 5
@@ -53,37 +54,41 @@ resurrection windowSize textures font window  = mdo
                                               player' <- delay initialPlayer player
 
                                               -- signal containing resurrections: used to calculate cost to life and also evolution of the world
-                                              resurrections <- transfer3 (False, []) resurrecting player' resurrectControl world'
+                                              resurrections <- transfer3 (False, []) (activated resurrectScope) player' resurrectControl world'
                                               resurrections' <- delay (False, []) resurrections
 
-                                              life <- transfer 20 lifeAccounting resurrections'
+                                              killing <- transfer3 (False, []) (activated killScope) player' killControl world'
+                                              killing' <- delay (False, []) killing
+
+                                              life <- transfer2 20 lifeAccounting resurrections' killing'
                                               life' <- delay 20 life
 
                                               -- state of the world
-
-                                              world <- transfer2 initialWorld (\dt p r w -> worldEvolution dt p r w) player' resurrectControl
+                                              world <- transfer3 initialWorld (\dt p r k w -> worldEvolution dt p r k w) player' resurrectControl killControl
                                               world' <- delay initialWorld world
 
-                                              return $ (renderLevel textures font window) <$> windowSize <*> world <*> player <*> life <*> fpsTracking
+                                              return $ (renderFrame textures font window) <$> windowSize <*> world <*> player <*> life <*> fpsTracking
 
 
 -- signal only pops up value when starting resurrection of a lifeform
 
-resurrecting dt (Player position _ _ _) True (World _ lifeforms) (False, previousResurrect) = (True, resurrectScope lifeforms position)
-resurrecting dt (Player position _ _ _) True (World _ lifeforms) (True, previousResurrect) = (True, [])
-resurrecting dt _                   False _                  _ = (False, [])
+activated scope dt (Player position _ _ _) True (World _ lifeforms) (False, previousResurrect) = (True, scope lifeforms position)
+activated scope dt (Player position _ _ _) True (World _ lifeforms) (True, previousResurrect) = (True, [])
+activated scope dt _                       False _                  _ = (False, [])
 
 tally lifeforms = foldr addLifeformCost 0 lifeforms
 
 addLifeformCost (Lifeform _ _ _ cost) currentCount = currentCount + cost
 
-lifeAccounting dt (True, resurrections) currentLife = currentLife - (tally resurrections)
-lifeAccounting dt (False, resurrections) currentLife = currentLife - (tally resurrections)
+lifeAccounting dt (_, resurrections) (_, killings) currentLife = currentLife - (tally resurrections) + (tally killings)
 
 resurrectScope lifeforms position = filter (\l ->  dead l && colliding l position) lifeforms
+killScope lifeforms position = filter (\l ->  alive l && colliding l position) lifeforms
 
 dead (Lifeform _ _ Dead _) = True
 dead (Lifeform _ _ _    _) = False
+alive (Lifeform _ _ Alive _) = True
+alive (Lifeform _ _ _    _) = False
 
 -- remove any lifeforms that haven't been completely resurrected -- todo when using resurrecting and dying status
 -- completed lifeforms = lifeforms
@@ -91,11 +96,16 @@ dead (Lifeform _ _ _    _) = False
 -- if player stands on lifeform, and lifeform is dead, and they press space (for resurrect), then the lifeform resurrects
 -- todo next step: points accounting (lifeform cost + player life down)
 -- todo: evolution of the life going from player to thing + way to represent this (text first step?)
-worldEvolution dt (Player position _ _ _) True (World background lifeforms) = World background (resurrect dt lifeforms position)
-worldEvolution dt _                   False world                       = world
+worldEvolution dt (Player position _ _ _) True False  (World background lifeforms) = World background (resurrect dt lifeforms position)
+worldEvolution dt (Player position _ _ _) False True  (World background lifeforms) = World background (kill dt lifeforms position)
+worldEvolution dt (Player position _ _ _) True True   world                        = world -- confused player
+worldEvolution dt _                       False False world                        = world
 
 resurrect dt lifeforms position = map (\lifeform -> resurrectColliding (colliding lifeform position) lifeform) lifeforms
+kill dt lifeforms position = map (\lifeform -> killColliding (colliding lifeform position) lifeform) lifeforms
 
 -- for now, but accounting will change this.
 resurrectColliding True (Lifeform pos species _ cost) = Lifeform pos species Alive cost
 resurrectColliding False lifeform = lifeform
+killColliding True (Lifeform pos species _ cost) = Lifeform pos species Dead cost
+killColliding False lifeform = lifeform

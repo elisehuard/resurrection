@@ -5,12 +5,8 @@ module Resurrection.Graphics
 , withWindow
 , keyIsPressed
 , resetTime
-, loadTexture
-, toTexture
 , loadTextures
-, playerTexture
-, backgroundTexture
-, renderLevel
+, renderFrame
 , colliding)
 where
 
@@ -31,7 +27,7 @@ import Debug.Trace
 
 -- constants
 
-playerWidth = 60 
+playerWidth = 70 
 playerHeight = (80 :: GLdouble)
 grassSize = (32 :: GLdouble)
 legSize = 15
@@ -127,8 +123,8 @@ loadTexture path = do
 
 loadTextures :: IO Textures
 loadTextures = do 
-                  loaded <- mapM loadTexture ["images/rocks.jpg", "images/alien.png", "images/alien-back.png", "images/alien-right.png", "images/alien-left.png", "images/alien-body.png", "images/alien-leg.png"]
-                  let names = ["level-1", "alien-front", "alien-back", "alien-right", "alien-left", "alien-body", "alien-leg"] 
+                  loaded <- mapM loadTexture ["images/background-1.png", "images/alien.png", "images/alien-back.png", "images/alien-right.png", "images/alien-left.png", "images/alien-body.png", "images/alien-body-right.png", "images/alien-body-left.png", "images/alien-body-back.png", "images/alien-leg.png", "images/alien-leg-side.png", "images/alien-leg-left.png"]
+                  let names = ["level-1", "alien-front", "alien-back", "alien-right", "alien-left", "alien-body", "alien-body-right", "alien-body-left", "alien-body-back", "alien-leg", "alien-leg-right", "alien-leg-left"] 
                       list  = zip names loaded
                   return $ Map.fromList list
 
@@ -141,21 +137,23 @@ toTexture (x,y) = texCoord2f (TexCoord2 x y)
 -- draw individual components
 
 --textureName :: (Draw a) => a -> String
-playerTexture (Player {direction = Front})   = lookupTexture "alien-front"
-playerTexture (Player {direction = GoBack})    = lookupTexture "alien-back"
-playerTexture (Player {direction = GoRight})   = lookupTexture "alien-right"
-playerTexture (Player {direction = GoLeft})    = lookupTexture "alien-left"
 backgroundTexture (Background _ _) = lookupTexture "level-1"
 
-bodyTexture = lookupTexture "alien-body"
-legTexture = lookupTexture "alien-leg"
+bodyTexture (Player {direction = Front}) = lookupTexture "alien-body"
+bodyTexture (Player {direction = GoBack}) = lookupTexture "alien-body-back"
+bodyTexture (Player {direction = GoLeft}) = lookupTexture "alien-body-left"
+bodyTexture (Player {direction = GoRight}) = lookupTexture "alien-body-right"
+legTexture (Player {direction = Front}) = lookupTexture "alien-leg"
+legTexture (Player {direction = GoBack}) = lookupTexture "alien-leg"
+legTexture (Player {direction = GoLeft}) = lookupTexture "alien-leg-left"
+legTexture (Player {direction = GoRight}) = lookupTexture "alien-leg-right"
 
 instance Draw Player where
    draw player textures = do 
                             loadIdentity
-                            drawLeftLeg player (legTexture textures)
-                            drawRightLeg player (legTexture textures)
-                            drawBody player (bodyTexture textures)
+                            drawLeftLeg player (legTexture player textures)
+                            drawRightLeg player (legTexture player textures)
+                            drawBody player (bodyTexture player textures)
 
 drawBody (Player (Vector2 x y) direction _ _) bodyTexture = do 
                                                             texture Texture2D $= Enabled
@@ -241,13 +239,13 @@ instance Draw Background where
                                                                 textureBinding Texture2D $= mbTexture
                                                                 loadIdentity
                                                                 renderPrimitive Quads $ do
-                                                                    toTexture (0, 0) 
+                                                                    toTexture (0, 1) 
                                                                     vertex $ Vertex2 (0 :: GLdouble) 0
-                                                                    toTexture (1, 0)
-                                                                    vertex $ Vertex2 width           0
                                                                     toTexture (1, 1)
+                                                                    vertex $ Vertex2 width           0
+                                                                    toTexture (1, 0)
                                                                     vertex $ Vertex2 width           height
-                                                                    toTexture (0, 1)
+                                                                    toTexture (0, 0)
                                                                     vertex $ Vertex2 0               height
                                                                 texture Texture2D $= Disabled
 
@@ -270,15 +268,15 @@ ycolliding (Lifeform (Vector2 g1 g2) Grass _ _) (Vector2 x y) = ((y - playerHeig
 colliding lifeform position = xcolliding lifeform position && ycolliding lifeform position
 
 -- the actual rendering
-renderLevel :: Textures -> FTGL.Font -> Window -> (GLdouble, GLdouble) -> World -> Player -> Life -> (Double, Double, Maybe Double) -> IO ()
-renderLevel textures font window windowSize world player life (_,_,fps) = do 
+renderFrame :: Textures -> FTGL.Font -> Window -> (GLdouble, GLdouble) -> World -> Player -> Life -> (Double, Double, Maybe Double) -> IO ()
+renderFrame textures font window windowSize world player life (_,_,fps) = do 
                                                 case fps of
                                                     Just value -> putStrLn $ "FPS: " ++ show value
                                                     Nothing -> return ()
                                                 clear [ColorBuffer, DepthBuffer]
                                                 draw world textures
                                                 draw player textures
-                                                printText font windowSize (Vertex2 (-200) 200) $ show life
+                                                printText font windowSize (Vertex2 (-260) 200) $ show life
                                                 flush
                                                 swapBuffers window
                                                 pollEvents -- Necessary for it not to freeze.
