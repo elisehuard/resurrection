@@ -123,8 +123,8 @@ loadTexture path = do
 
 loadTextures :: IO Textures
 loadTextures = do 
-                  loaded <- mapM loadTexture ["images/background-1.png", "images/alien.png", "images/alien-back.png", "images/alien-right.png", "images/alien-left.png", "images/alien-body.png", "images/alien-body-right.png", "images/alien-body-left.png", "images/alien-body-back.png", "images/alien-leg.png", "images/alien-leg-side.png", "images/alien-leg-left.png"]
-                  let names = ["level-1", "alien-front", "alien-back", "alien-right", "alien-left", "alien-body", "alien-body-right", "alien-body-left", "alien-body-back", "alien-leg", "alien-leg-right", "alien-leg-left"] 
+                  loaded <- mapM loadTexture ["images/background-1.png", "images/alien.png", "images/alien-back.png", "images/alien-right.png", "images/alien-left.png", "images/alien-body.png", "images/alien-body-right.png", "images/alien-body-left.png", "images/alien-body-back.png", "images/alien-leg.png", "images/alien-leg-side.png", "images/alien-leg-left.png", "images/grass-dead.png", "images/grass-alive.png"]
+                  let names = ["level-1", "alien-front", "alien-back", "alien-right", "alien-left", "alien-body", "alien-body-right", "alien-body-left", "alien-body-back", "alien-leg", "alien-leg-right", "alien-leg-left", "grass-dead", "grass-alive"] 
                       list  = zip names loaded
                   return $ Map.fromList list
 
@@ -220,17 +220,26 @@ drawLeg x y animx animy legTexture = do
                                         translate (Vector3 0 (-20) (0 :: GLdouble))
                                     texture Texture2D $= Disabled
 
+lifeformTexture (Lifeform _ Grass Alive _) = lookupTexture "grass-alive"
+lifeformTexture (Lifeform _ Grass Dead _) = lookupTexture "grass-dead"
+
 instance Draw Lifeform where
-  draw (Lifeform (Vector2 x y) Grass alive _) _ = do
-                                    case alive of
-                                        Dead -> color $ Color4 0.33 0.41 0.18 (1 :: GLfloat)
-                                        Alive -> color $ Color4 0.4 1.0 0 (1 :: GLfloat)
+  draw lifeform@(Lifeform (Vector2 x y) Grass alive _) textures = do
+                                    let mbTexture = lifeformTexture lifeform textures
+                                    texture Texture2D $= Enabled
+                                    textureFunction $= Replace
+                                    textureBinding Texture2D $= mbTexture
                                     loadIdentity
                                     renderPrimitive Quads $ do
+                                        toTexture (0,1)
                                         vertex $ Vertex2 (x - grassSize) (y - grassSize)
+                                        toTexture (1,1)
                                         vertex $ Vertex2 (x + grassSize) (y - grassSize)
+                                        toTexture (1,0)
                                         vertex $ Vertex2 (x + grassSize) (y + grassSize)
+                                        toTexture (0,0)
                                         vertex $ Vertex2 (x - grassSize) (y + grassSize)
+                                    texture Texture2D $= Disabled
 
 instance Draw Background where
   draw background@(Background _ (width, height)) textures = do  let mbTexture = backgroundTexture background textures
