@@ -4,6 +4,7 @@ module Resurrection.Game where
 import FRP.Elerea.Param
 import Resurrection.Types
 import Resurrection.Graphics
+import Resurrection.Utils
 import Graphics.Rendering.OpenGL hiding (Front)
 import qualified Graphics.Rendering.FTGL as FTGL
 import Control.Applicative hiding (Const)
@@ -13,7 +14,6 @@ import Debug.Trace
 -- initial player position
 playerPos0 = Vector2 200 200
 initialPlayer = Player { pos = playerPos0, direction = Front, action = Neutral, tick =  0 }
-initialWorld = World (Background (Level 1) (640, 480)) [Lifeform (Vector2 300 300) Grass Dead 5]
 initialLife = 20
 
 -- TODO limits of the world - go round?
@@ -31,7 +31,19 @@ oscillating t
            | otherwise = t + pi/6
 
 resurrection :: Signal (GLdouble, GLdouble) -> Textures -> FTGL.Font -> Window -> SignalGen Double (Signal (IO())) 
-resurrection windowSize textures font window  = mdo 
+resurrection windowSize textures font window = mdo
+  let initialGameState = Between 1
+      startLevel level = playLevel window level
+
+  (levelState, levelTrigger) <- switcher (startLevel <$> levelCount)
+  levelTrigger' <- delay False levelTrigger
+  levelCount <- transfer 1 (\dt success current -> if success then current+1 else current) levelTrigger'
+  return $ (renderFrame textures font window) <$> windowSize <*> levelState
+
+
+
+playLevel :: Window -> Int -> SignalGen Double (Signal LevelState, Signal Bool)
+playLevel window levelCount = mdo 
                                               directionControl <- effectful $ (,,,)
                                                 <$> keyIsPressed window Key'Left
                                                 <*> keyIsPressed window Key'Up
@@ -39,17 +51,11 @@ resurrection windowSize textures font window  = mdo
                                                 <*> keyIsPressed window Key'Right
                                               resurrectControl <- effectful $ keyIsPressed window Key'Space
                                               killControl <- effectful $ keyIsPressed window Key'K
-                                              fpsTracking <- stateful (0, 0, Nothing) $ \dt (time, count, _) ->
-                                                    let time' = time + dt
-                                                        done = time > 5
-                                                    in if done
-                                                    then (0, 0, Just (count / time'))
-                                                    else (time', count + 1, Nothing)
 
                                               -- life evolution todo
                                               --    when resurrecting something:
                                               --    decrement life until either the thing is resurrected or the player dies
-                                              --life <- transfer initialLife evolveLife resurrectControl
+                                              -- player: initialPlayer in function of level? or continuation of upper level stuff?
                                               player <- transfer initialPlayer (\dt keyP p -> updateFromKey p keyP) directionControl
                                               player' <- delay initialPlayer player
 
@@ -60,15 +66,17 @@ resurrection windowSize textures font window  = mdo
                                               killing <- transfer3 (False, []) (activated killScope) player' killControl world'
                                               killing' <- delay (False, []) killing
 
+                                              -- todo: initialLife in function of level? or continuation of upper level stuff?
                                               life <- transfer2 20 lifeAccounting resurrections' killing'
                                               life' <- delay 20 life
 
                                               -- state of the world
-                                              world <- transfer3 initialWorld (\dt p r k w -> worldEvolution dt p r k w) player' resurrectControl killControl
-                                              world' <- delay initialWorld world
+                                              -- todo: initialWorld in function of level
+                                              world <- transfer3 (initialWorld levelCount) (\dt p r k w -> worldEvolution dt p r k w) player' resurrectControl killControl
+                                              world' <- delay (initialWorld levelCount) world
 
-                                              return $ (renderFrame textures font window) <$> windowSize <*> world <*> player <*> life <*> fpsTracking
-
+                                              return ( LevelState levelCount <$> world <*> player <*> life -- level state
+                                                      , goalAchieved levelCount <$> world <*> player <*> life) -- goal achieved in level
 
 -- signal only pops up value when starting resurrection of a lifeform
 
@@ -109,3 +117,11 @@ resurrectColliding True (Lifeform pos species _ cost) = Lifeform pos species Ali
 resurrectColliding False lifeform = lifeform
 killColliding True (Lifeform pos species _ cost) = Lifeform pos species Dead cost
 killColliding False lifeform = lifeform
+
+-- Data per level
+--   - goal to be achieved
+--   - initial world
+goalAchieved levelCount (World _ lifeforms) _ _ = all alive lifeforms
+
+initialWorld 1 = World (Background (Level 1) (640, 480)) [Lifeform (Vector2 300 300) Grass Dead 5]
+initialWorld 2 = World (Background (Level 1) (640, 480)) [Lifeform (Vector2 200 200) Grass Dead 5, Lifeform (Vector2 400 400) Grass Dead 5]

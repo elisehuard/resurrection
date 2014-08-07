@@ -23,7 +23,6 @@ main :: IO ()
 main = do 
     let width  = 640
         height = 480
-        gameState = Menu
 
     (keyPress,keyPressSink) <- external Nothing
     (closeGame, closeGameSink) <- external False

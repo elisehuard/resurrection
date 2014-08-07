@@ -4,7 +4,7 @@ import Graphics.Rendering.OpenGL
 import qualified Data.Map.Strict as Map
 import Control.Monad.Reader
 
-data GameState = Menu | Level Int
+data GameState = Between Int | Level Int
                  deriving Show
 
 data LifeStatus = Alive | Dead | Resurrecting Int | Dying Int
@@ -39,6 +39,8 @@ data Action = Neutral | Walking
               deriving Show
 
 type Textures = Map.Map String (Maybe TextureObject)
+
+data LevelState = LevelState Int World Player Life 
 
 -- passing in textures as reader
 class Draw a where

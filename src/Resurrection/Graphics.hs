@@ -277,11 +277,8 @@ ycolliding (Lifeform (Vector2 g1 g2) Grass _ _) (Vector2 x y) = ((y - playerHeig
 colliding lifeform position = xcolliding lifeform position && ycolliding lifeform position
 
 -- the actual rendering
-renderFrame :: Textures -> FTGL.Font -> Window -> (GLdouble, GLdouble) -> World -> Player -> Life -> (Double, Double, Maybe Double) -> IO ()
-renderFrame textures font window windowSize world player life (_,_,fps) = do 
-                                                case fps of
-                                                    Just value -> putStrLn $ "FPS: " ++ show value
-                                                    Nothing -> return ()
+renderFrame :: Textures -> FTGL.Font -> Window -> (GLdouble, GLdouble) -> LevelState -> IO ()
+renderFrame textures font window windowSize (LevelState _ world player life) = do 
                                                 clear [ColorBuffer, DepthBuffer]
                                                 draw world textures
                                                 draw player textures
@@ -289,3 +286,10 @@ renderFrame textures font window windowSize world player life (_,_,fps) = do
                                                 flush
                                                 swapBuffers window
                                                 pollEvents -- Necessary for it not to freeze.
+
+renderMenu :: Window -> IO ()
+renderMenu window = do
+               clear [ColorBuffer, DepthBuffer]
+               flush
+               swapBuffers window
+               pollEvents -- Necessary for it not to freeze.
