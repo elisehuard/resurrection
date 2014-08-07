@@ -4,7 +4,7 @@ module Resurrection.Game where
 import FRP.Elerea.Param
 import Resurrection.Types
 import Resurrection.Graphics
-import Resurrection.Utils
+import Resurrection.FRP
 import Graphics.Rendering.OpenGL hiding (Front)
 import qualified Graphics.Rendering.FTGL as FTGL
 import Control.Applicative hiding (Const)
