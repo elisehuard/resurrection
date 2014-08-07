@@ -295,12 +295,16 @@ colliding lifeform position = xcolliding lifeform position && ycolliding lifefor
 
 -- the actual rendering
 renderFrame :: Textures -> FTGL.Font -> Window -> (GLdouble, GLdouble) -> LevelState -> IO ()
-renderFrame textures font window windowSize (LevelState _ world player life) = do 
+renderFrame textures font window windowSize (LevelState _ world player life success) = do 
                                                 clear [ColorBuffer, DepthBuffer]
                                                 draw world textures
                                                 draw player textures
                                                 let fontColor = Color4 0 0 0 (1 :: GLfloat)
-                                                printText fontColor font windowSize (Vertex2 (-260) 200) $ show life
+                                                printText fontColor font 24 windowSize (Vertex2 (-260) 200) $ show life
+                                                if success then
+                                                   printText fontColor font 24 windowSize (Vertex2 (-50) 0) "Congratulations!"
+                                                else
+                                                   printText fontColor font 24 windowSize (Vertex2 (-260) 200) $ show life
                                                 flush
                                                 swapBuffers window
                                                 pollEvents -- Necessary for it not to freeze.
@@ -309,8 +313,8 @@ renderFrame textures font window windowSize (InBetweenState level world) = do
                                                 clear [ColorBuffer, DepthBuffer]
                                                 draw world textures
                                                 let color = Color4 1 1 1 (1 :: GLfloat)
-                                                printText color font windowSize (Vertex2 (-260) 200) "Press n to move to next level"
-                                                printText color font windowSize (Vertex2 (-260) 100) $ show level
+                                                printText color font 12 windowSize (Vertex2 (-260) 200) "Press n to move to next level"
+                                                printText color font 24 windowSize (Vertex2 (-260) 100) $ show level
                                                 flush
                                                 swapBuffers window
                                                 pollEvents -- Necessary for it not to freeze.

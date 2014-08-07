@@ -40,7 +40,11 @@ type Textures = Map.Map String (Maybe TextureObject)
 data Level = Between Int | Level Int
              deriving Show
 
-data LevelState = LevelState Level World Player Life |
+data LevelState = LevelState { level :: Level
+                             , world :: World
+                             , player :: Player
+                             , life :: Life
+                             , success :: Bool } |
                   InBetweenState Level World
 
 -- passing in textures as reader

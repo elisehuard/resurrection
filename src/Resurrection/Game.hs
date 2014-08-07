@@ -51,6 +51,7 @@ playLevel window level@(Level _) = mdo
                                                 <*> keyIsPressed window Key'Right
                                               resurrectControl <- effectful $ keyIsPressed window Key'Space
                                               killControl <- effectful $ keyIsPressed window Key'K
+                                              nextControl <- effectful $ keyIsPressed window Key'N
 
                                               -- life evolution todo
                                               --    when resurrecting something:
@@ -75,8 +76,10 @@ playLevel window level@(Level _) = mdo
                                               world <- transfer3 (initialWorld level) (\dt p r k w -> worldEvolution dt p r k w) player' resurrectControl killControl
                                               world' <- delay (initialWorld level) world
 
-                                              return ( LevelState level <$> world <*> player <*> life -- level state
-                                                      , goalAchieved level <$> world <*> player <*> life) -- goal achieved in level
+                                              let success = goalAchieved level <$> world <*> player <*> life
+
+                                              return ( LevelState level <$> world <*> player <*> life <*> success -- level state
+                                                      , liftA2 (&&) success nextControl ) -- goal achieved in level - move on to next
 
 -- player only needs to indicate when wants to progress
 playLevel window level@(Between _) = mdo 
@@ -126,7 +129,7 @@ resurrectColliding False lifeform = lifeform
 killColliding True (Lifeform pos species _ cost) = Lifeform pos species Dead cost
 killColliding False lifeform = lifeform
 
--- Data per level
+-- Data per level: parse from file when established what's needed
 --   - goal to be achieved
 --   - initial world
 --   - explanatory text
@@ -134,6 +137,7 @@ goalAchieved (Level _) (World _ lifeforms) _ _ = all alive lifeforms
 
 inBetweenWorld (Between 1) = World (Background (Between 1) (640, 480)) []
 inBetweenWorld (Between 2) = World (Background (Between 1) (640, 480)) []
+
 initialWorld (Level 1) = World (Background (Level 1) (640, 480)) [Lifeform (Vector2 300 300) Grass Dead 5]
 initialWorld (Level 2) = World (Background (Level 1) (640, 480)) [Lifeform (Vector2 200 200) Grass Dead 5, Lifeform (Vector2 400 400) Grass Dead 5]
 
