@@ -153,7 +153,8 @@ toTexture (x,y) = texCoord2f (TexCoord2 x y)
 -- draw individual components
 
 --textureName :: (Draw a) => a -> String
-backgroundTexture (Background _ _) = lookupTexture "level-1"
+backgroundTexture (Background (Level _) _) = lookupTexture "level-1"
+backgroundTexture (Background (Between _) _) = lookupTexture "between-1"
 
 bodyTexture (Player {direction = Front}) = lookupTexture "alien-body"
 bodyTexture (Player {direction = GoBack}) = lookupTexture "alien-body-back"
@@ -298,14 +299,18 @@ renderFrame textures font window windowSize (LevelState _ world player life) = d
                                                 clear [ColorBuffer, DepthBuffer]
                                                 draw world textures
                                                 draw player textures
-                                                printText font windowSize (Vertex2 (-260) 200) $ show life
+                                                let fontColor = Color4 0 0 0 (1 :: GLfloat)
+                                                printText fontColor font windowSize (Vertex2 (-260) 200) $ show life
                                                 flush
                                                 swapBuffers window
                                                 pollEvents -- Necessary for it not to freeze.
 
-renderMenu :: Window -> IO ()
-renderMenu window = do
-               clear [ColorBuffer, DepthBuffer]
-               flush
-               swapBuffers window
-               pollEvents -- Necessary for it not to freeze.
+renderFrame textures font window windowSize (InBetweenState level world) = do 
+                                                clear [ColorBuffer, DepthBuffer]
+                                                draw world textures
+                                                let color = Color4 1 1 1 (1 :: GLfloat)
+                                                printText color font windowSize (Vertex2 (-260) 200) "Press n to move to next level"
+                                                printText color font windowSize (Vertex2 (-260) 100) $ show level
+                                                flush
+                                                swapBuffers window
+                                                pollEvents -- Necessary for it not to freeze.

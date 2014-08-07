@@ -1,18 +1,15 @@
 module Resurrection.Types where
 
-import Graphics.Rendering.OpenGL
+import Graphics.Rendering.OpenGL hiding (Level)
 import qualified Data.Map.Strict as Map
 import Control.Monad.Reader
-
-data GameState = Between Int | Level Int
-                 deriving Show
 
 data LifeStatus = Alive | Dead | Resurrecting Int | Dying Int
                   deriving Show
 
 type Life = Int
 
-data Background = Background GameState (GLdouble, GLdouble)
+data Background = Background Level (GLdouble, GLdouble)
                   deriving Show
 
 data Species = Grass
@@ -40,7 +37,11 @@ data Action = Neutral | Walking
 
 type Textures = Map.Map String (Maybe TextureObject)
 
-data LevelState = LevelState Int World Player Life 
+data Level = Between Int | Level Int
+             deriving Show
+
+data LevelState = LevelState Level World Player Life |
+                  InBetweenState Level World
 
 -- passing in textures as reader
 class Draw a where

@@ -5,7 +5,7 @@ import FRP.Elerea.Param
 import Resurrection.Types
 import Resurrection.Graphics
 import Resurrection.FRP
-import Graphics.Rendering.OpenGL hiding (Front)
+import Graphics.Rendering.OpenGL hiding (Front, Level)
 import qualified Graphics.Rendering.FTGL as FTGL
 import Control.Applicative hiding (Const)
 import "GLFW-b" Graphics.UI.GLFW as GLFW
@@ -32,18 +32,18 @@ oscillating t
 
 resurrection :: Signal (GLdouble, GLdouble) -> Textures -> FTGL.Font -> Window -> SignalGen Double (Signal (IO())) 
 resurrection windowSize textures font window = mdo
-  let initialGameState = Between 1
+  let initialLevel = Between 1
       startLevel level = playLevel window level
 
   (levelState, levelTrigger) <- switcher (startLevel <$> levelCount)
   levelTrigger' <- delay False levelTrigger
-  levelCount <- transfer 1 (\dt success current -> if success then current+1 else current) levelTrigger'
+  levelCount <- transfer initialLevel levelProgression levelTrigger'
   return $ (renderFrame textures font window) <$> windowSize <*> levelState
 
 
 
-playLevel :: Window -> Int -> SignalGen Double (Signal LevelState, Signal Bool)
-playLevel window levelCount = mdo 
+playLevel :: Window -> Level -> SignalGen Double (Signal LevelState, Signal Bool)
+playLevel window level@(Level _) = mdo 
                                               directionControl <- effectful $ (,,,)
                                                 <$> keyIsPressed window Key'Left
                                                 <*> keyIsPressed window Key'Up
@@ -72,11 +72,19 @@ playLevel window levelCount = mdo
 
                                               -- state of the world
                                               -- todo: initialWorld in function of level
-                                              world <- transfer3 (initialWorld levelCount) (\dt p r k w -> worldEvolution dt p r k w) player' resurrectControl killControl
-                                              world' <- delay (initialWorld levelCount) world
+                                              world <- transfer3 (initialWorld level) (\dt p r k w -> worldEvolution dt p r k w) player' resurrectControl killControl
+                                              world' <- delay (initialWorld level) world
 
-                                              return ( LevelState levelCount <$> world <*> player <*> life -- level state
-                                                      , goalAchieved levelCount <$> world <*> player <*> life) -- goal achieved in level
+                                              return ( LevelState level <$> world <*> player <*> life -- level state
+                                                      , goalAchieved level <$> world <*> player <*> life) -- goal achieved in level
+
+-- player only needs to indicate when wants to progress
+playLevel window level@(Between _) = mdo 
+                                         nextControl <- effectful $ keyIsPressed window Key'N
+                                         -- artificially make state a constant signal for now?
+                                         let state = InBetweenState level (inBetweenWorld level)
+                                         return ( pure state 
+                                                , id <$> nextControl )
 
 -- signal only pops up value when starting resurrection of a lifeform
 
@@ -121,7 +129,15 @@ killColliding False lifeform = lifeform
 -- Data per level
 --   - goal to be achieved
 --   - initial world
-goalAchieved levelCount (World _ lifeforms) _ _ = all alive lifeforms
+--   - explanatory text
+goalAchieved (Level _) (World _ lifeforms) _ _ = all alive lifeforms
 
-initialWorld 1 = World (Background (Level 1) (640, 480)) [Lifeform (Vector2 300 300) Grass Dead 5]
-initialWorld 2 = World (Background (Level 1) (640, 480)) [Lifeform (Vector2 200 200) Grass Dead 5, Lifeform (Vector2 400 400) Grass Dead 5]
+inBetweenWorld (Between 1) = World (Background (Between 1) (640, 480)) []
+inBetweenWorld (Between 2) = World (Background (Between 1) (640, 480)) []
+initialWorld (Level 1) = World (Background (Level 1) (640, 480)) [Lifeform (Vector2 300 300) Grass Dead 5]
+initialWorld (Level 2) = World (Background (Level 1) (640, 480)) [Lifeform (Vector2 200 200) Grass Dead 5, Lifeform (Vector2 400 400) Grass Dead 5]
+
+-- boolean indicates whether goal of level was achieved
+levelProgression _ False current = current
+levelProgression _ True (Level n) = Between (n + 1)
+levelProgression _ True (Between n) = Level n
