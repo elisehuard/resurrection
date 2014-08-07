@@ -123,9 +123,25 @@ loadTexture path = do
 
 loadTextures :: IO Textures
 loadTextures = do 
-                  loaded <- mapM loadTexture ["images/background-1.png", "images/alien.png", "images/alien-back.png", "images/alien-right.png", "images/alien-left.png", "images/alien-body.png", "images/alien-body-right.png", "images/alien-body-left.png", "images/alien-body-back.png", "images/alien-leg.png", "images/alien-leg-side.png", "images/alien-leg-left.png", "images/grass-dead.png", "images/grass-alive.png"]
-                  let names = ["level-1", "alien-front", "alien-back", "alien-right", "alien-left", "alien-body", "alien-body-right", "alien-body-left", "alien-body-back", "alien-leg", "alien-leg-right", "alien-leg-left", "grass-dead", "grass-alive"] 
-                      list  = zip names loaded
+                  let textures = [("level-1", "images/background-1.png")
+                                , ("between-1", "images/between-1.png")
+                                , ("alien-front", "images/alien.png")
+                                , ("alien-back", "images/alien-back.png")
+                                , ("alien-right", "images/alien-right.png")
+                                , ("alien-left", "images/alien-left.png")
+                                , ("alien-body", "images/alien-body.png")
+                                , ("alien-body-right", "images/alien-body-right.png")
+                                , ("alien-body-left", "images/alien-body-left.png")
+                                , ("alien-body-back", "images/alien-body-back.png")
+                                , ("alien-leg", "images/alien-leg.png")
+                                , ("alien-leg-right", "images/alien-leg-side.png")
+                                , ("alien-leg-left", "images/alien-leg-left.png")
+                                , ("grass-dead", "images/grass-dead.png")
+                                , ("grass-alive", "images/grass-alive.png")] 
+                  list <- mapM (\(name, file) -> do 
+                                  texture <- loadTexture file
+                                  return $ (,) name texture) textures
+
                   return $ Map.fromList list
 
 lookupTexture :: String -> Textures -> Maybe TextureObject
