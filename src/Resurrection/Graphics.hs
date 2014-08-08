@@ -313,7 +313,7 @@ renderFrame textures font window windowSize (InBetweenState level world) = do
                                                 clear [ColorBuffer, DepthBuffer]
                                                 draw world textures
                                                 let color = Color4 1 1 1 (1 :: GLfloat)
-                                                printText color font 12 windowSize (Vertex2 (-260) 200) "Press n to move to next level"
+                                                printText color font 12 windowSize (Vertex2 (-260) 200) "Press Enter to move to next level"
                                                 printText color font 24 windowSize (Vertex2 (-260) 100) $ show level
                                                 flush
                                                 swapBuffers window

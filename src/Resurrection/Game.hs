@@ -51,7 +51,7 @@ playLevel window level@(Level _) = mdo
                                                 <*> keyIsPressed window Key'Right
                                               resurrectControl <- effectful $ keyIsPressed window Key'Space
                                               killControl <- effectful $ keyIsPressed window Key'K
-                                              nextControl <- effectful $ keyIsPressed window Key'N
+                                              nextControl <- effectful $ keyIsPressed window Key'Enter
 
                                               -- life evolution todo
                                               --    when resurrecting something:
@@ -83,11 +83,13 @@ playLevel window level@(Level _) = mdo
 
 -- player only needs to indicate when wants to progress
 playLevel window level@(Between _) = mdo 
-                                         nextControl <- effectful $ keyIsPressed window Key'N
-                                         -- artificially make state a constant signal for now?
+                                         nextControl <- effectful $ keyIsPressed window Key'Enter
+                                         -- signal to avoid passing to next level as soon as reached
+                                         accum <- stateful 0 (+)
+                                         active <- transfer False (\dt a b -> b || (a > 1)) accum 
                                          let state = InBetweenState level (inBetweenWorld level)
                                          return ( pure state 
-                                                , id <$> nextControl )
+                                                , (&&) <$> nextControl <*> active )
 
 -- signal only pops up value when starting resurrection of a lifeform
 
