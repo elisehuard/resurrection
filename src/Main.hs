@@ -4,13 +4,14 @@ import Resurrection.Text
 import Resurrection.FRP
 import Resurrection.Graphics
 import Resurrection.Game
+import Resurrection.Sound (backgroundMusic)
 import Data.IORef
 -- todo is param really necessary?
 import FRP.Elerea.Param
 import System.Exit ( exitWith, ExitCode(ExitSuccess), exitFailure)
 import Graphics.Rendering.OpenGL (GLdouble)
 import "GLFW-b" Graphics.UI.GLFW as GLFW
-import Control.Concurrent (threadDelay)
+import Control.Concurrent (threadDelay, forkIO)
 import Data.Maybe (fromJust)
 import Data.List (find)
 import Control.Monad.Reader
@@ -38,6 +39,7 @@ main = do
 
           textures <- loadTextures
           font <- loadFont "fonts/Sketch_Block.ttf"
+          __ <- forkIO (backgroundMusic "sounds/spooky.wav")
 
           -- All we need to get going is an IO-valued signal and an IO
           -- function to update the external signals

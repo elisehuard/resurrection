@@ -1,7 +1,7 @@
 {-# LANGUAGE RecursiveDo #-}
 module Resurrection.FRP 
 ( driveNetwork
-, switcher)
+, levelGen)
 where
 
 import FRP.Elerea.Param
@@ -28,19 +28,16 @@ x0 --> s = transfer x0 store s
     where store _ Nothing  x = x
           store _ (Just x) _ = x
 
--- result: generated signal, bool
-{-
-switcher :: SignalGen (Signal (Signal b0, Signal Bool), Signal Bool) -> 
-            ((Signal (Signal b0, Signal Bool), Signal Bool) -> SignalGen (Signal Bool))
-            -> (Signal (IO ()), Signal Bool)
--}
--- gen  SignalGen Double (IO ())
--- generator goes Signal (SignalGen p a) -> SignalGen p (Signal a)
-switcher gen = mdo
-  trig <- memo (snd =<< pw)
+first (a, _, _) = a
+second (_, a, _) = a
+third (_, _, a) = a
+
+-- returns (signal levelstate, signal sounds, signal bool) based on provided generator
+levelGen gen = mdo
+  trig <- memo (third =<< pw)
   trig' <- delay True trig -- signal bool
   ss <- generator (toMaybe <$> trig' <*> gen) -- signal of generators to run
   pw <- undefined --> ss -- signal that starts at undefined and progresses on path of generator
-  return (fst =<< pw,trig)
+  return (first =<< pw, second =<< pw,trig)
 
 toMaybe b s = if b then Just <$> s else pure Nothing

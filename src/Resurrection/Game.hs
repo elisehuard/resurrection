@@ -5,6 +5,7 @@ import FRP.Elerea.Param
 import Resurrection.Types
 import Resurrection.Graphics
 import Resurrection.FRP
+import Resurrection.Sound
 import Graphics.Rendering.OpenGL hiding (Front, Level)
 import qualified Graphics.Rendering.FTGL as FTGL
 import Control.Applicative hiding (Const)
@@ -30,19 +31,21 @@ oscillating t
            | t == 2*pi  = 0
            | otherwise = t + pi/6
 
+outputFunction :: Textures -> FTGL.Font -> Window -> (GLdouble, GLdouble) -> LevelState -> SoundSignal -> IO ()
+outputFunction textures font window windowSize levelState soundSignals =  (renderFrame textures font window windowSize levelState) >> (playSounds soundSignals)
+
 resurrection :: Signal (GLdouble, GLdouble) -> Textures -> FTGL.Font -> Window -> SignalGen Double (Signal (IO())) 
 resurrection windowSize textures font window = mdo
   let initialLevel = Between 1
       startLevel level = playLevel window level
 
-  (levelState, levelTrigger) <- switcher (startLevel <$> levelCount)
+  (levelState, soundState, levelTrigger) <- levelGen (startLevel <$> levelCount)
   levelTrigger' <- delay False levelTrigger
   levelCount <- transfer initialLevel levelProgression levelTrigger'
-  return $ (renderFrame textures font window) <$> windowSize <*> levelState
+  return $ (outputFunction textures font window) <$> windowSize <*> levelState <*> soundState
 
 
-
-playLevel :: Window -> Level -> SignalGen Double (Signal LevelState, Signal Bool)
+playLevel :: Window -> Level -> SignalGen Double (Signal LevelState, Signal SoundSignal, Signal Bool)
 playLevel window level@(Level _) = mdo 
                                               directionControl <- effectful $ (,,,)
                                                 <$> keyIsPressed window Key'Left
@@ -79,16 +82,20 @@ playLevel window level@(Level _) = mdo
                                               let success = goalAchieved level <$> world <*> player <*> life
 
                                               return ( LevelState level <$> world <*> player <*> life <*> success -- level state
+                                                     , soundSignal <$> resurrections <*> killing -- notifications for sound
                                                       , liftA2 (&&) success nextControl ) -- goal achieved in level - move on to next
+                                              where soundSignal (boolRes, _) (boolKill, _) = SoundSignal boolRes boolKill
 
 -- player only needs to indicate when wants to progress
 playLevel window level@(Between _) = mdo 
                                          nextControl <- effectful $ keyIsPressed window Key'Enter
                                          -- signal to avoid passing to next level as soon as reached
                                          accum <- stateful 0 (+)
-                                         active <- transfer False (\dt a b -> b || (a > 1)) accum 
+                                         active <- transfer False (\dt a b -> b || (a > 1)) accum
                                          let state = InBetweenState level (inBetweenWorld level)
-                                         return ( pure state 
+                                             sound = SoundSignal False False
+                                         return ( pure state
+                                                , pure sound
                                                 , (&&) <$> nextControl <*> active )
 
 -- signal only pops up value when starting resurrection of a lifeform
