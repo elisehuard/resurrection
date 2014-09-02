@@ -3,6 +3,8 @@ module Resurrection.Types where
 import Graphics.Rendering.OpenGL hiding (Level)
 import qualified Data.Map.Strict as Map
 import Control.Monad.Reader
+import Control.Lens hiding (Level, Action)
+import Control.Applicative ((<$>))
 
 data LifeStatus = Alive | Dead | Resurrecting Int | Dying Int
                   deriving Show
@@ -45,7 +47,7 @@ data LevelState = LevelState { level :: Level
                              , player :: Player
                              , life :: Life
                              , success :: Bool } |
-                  InBetweenState Level World
+                  InBetweenState Level World Double
 
 -- transfer of data related to sounds
 data SoundSignal = SoundSignal { res :: Bool,

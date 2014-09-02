@@ -92,11 +92,15 @@ playLevel window level@(Between _) = mdo
                                          -- signal to avoid passing to next level as soon as reached
                                          accum <- stateful 0 (+)
                                          active <- transfer False (\dt a b -> b || (a > 1)) accum
+                                         fadeIn <- stateful 0 (\dt previous -> cappedIncrease previous)
                                          let state = InBetweenState level (inBetweenWorld level)
                                              sound = SoundSignal False False
-                                         return ( pure state
+                                         return ( state <$> fadeIn
                                                 , pure sound
                                                 , (&&) <$> nextControl <*> active )
+                                         where cappedIncrease num
+                                                    | num < 1 = num + 0.005
+                                                    | otherwise = 1
 
 -- signal only pops up value when starting resurrection of a lifeform
 
