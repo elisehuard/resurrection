@@ -41,5 +41,5 @@ playSound path = do
         return ()
 
 playSounds :: SoundSignal -> IO ()
-playSounds (SoundSignal True _) = playSound "sounds/rising.wav"
+playSounds (SoundSignal True _) = playSound "sounds/wobbly-resurrection.wav"
 playSounds (SoundSignal _    _) = return ()
