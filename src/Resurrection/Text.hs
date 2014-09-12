@@ -6,10 +6,9 @@ import Graphics.Rendering.FTGL
 loadFont :: String -> IO Font
 loadFont path = createTextureFont path
 
-printText :: Color4 GLfloat -> Font -> Int ->  (GLdouble, GLdouble) -> Vertex2 GLdouble -> String -> IO ()
-printText color4 font size (width, height) (Vertex2 x y) text = do
-   do color $ color4
-      let xpos = (realToFrac width/2) + x 
+printText :: Font -> Int ->  (GLdouble, GLdouble) -> Vertex2 GLdouble -> String -> IO ()
+printText font size (width, height) (Vertex2 x y) text = do
+   do let xpos = (realToFrac width/2) + x 
           ypos = (realToFrac height/2) + y
       setFontFaceSize font size 72
       loadIdentity

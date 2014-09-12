@@ -81,17 +81,20 @@ playLevel window level@(Level _) = mdo
 
                                               let success = goalAchieved level <$> world <*> player <*> life
 
-                                              return ( LevelState level <$> world <*> player <*> life <*> success -- level state
+                                              trackLevelStage <- transfer2 (Introduction, 0) (\dt next succeeded stage -> transition dt stage next succeeded) nextControl success
+                                              let levelStage = fst <$> trackLevelStage 
+                                                  completed = (== End) <$> levelStage
+
+                                              return ( LevelState level <$> levelStage <*> world <*> player <*> life <*> success -- level state
                                                      , soundSignal <$> resurrections <*> killing -- notifications for sound
-                                                      , liftA2 (&&) success nextControl ) -- goal achieved in level - move on to next
+                                                      , liftA2 (&&) completed nextControl ) -- goal achieved in level - move on to next
                                               where soundSignal (boolRes, _) (boolKill, _) = SoundSignal boolRes boolKill
 
 -- player only needs to indicate when wants to progress
 playLevel window level@(Between _) = mdo 
                                          nextControl <- effectful $ keyIsPressed window Key'Enter
                                          -- signal to avoid passing to next level as soon as reached
-                                         accum <- stateful 0 (+)
-                                         active <- transfer False (\dt a b -> b || (a > 1)) accum
+                                         active <- activeSignal
                                          fadeIn <- stateful 0 (\dt previous -> cappedIncrease previous)
                                          let state = InBetweenState level (inBetweenWorld level)
                                              sound = SoundSignal False False
@@ -146,7 +149,8 @@ killColliding False lifeform = lifeform
 --   - goal to be achieved
 --   - initial world
 --   - explanatory text
-goalAchieved (Level _) (World _ lifeforms) _ _ = all alive lifeforms
+goalAchieved (Level 1) (World _ lifeforms) _ _ = all alive lifeforms
+goalAchieved (Level 2) (World _ lifeforms) _ _ = any alive lifeforms
 
 inBetweenWorld (Between 1) = World (Background (Between 1) (640, 480)) []
 inBetweenWorld (Between 2) = World (Background (Between 1) (640, 480)) []
@@ -156,5 +160,27 @@ initialWorld (Level 2) = World (Background (Level 1) (640, 480)) [Lifeform (Vect
 
 -- boolean indicates whether goal of level was achieved
 levelProgression _ False current = current
-levelProgression _ True (Level n) = Between (n + 1)
+levelProgression _ True (Level n) = Level (n + 1)
 levelProgression _ True (Between n) = Level n
+
+-- transition of level stage
+-- (\dt next succeeded stage -> transition stage next succeeded)
+-- also return the time since last transition - no transitions right after arriving into state
+transition dt (Introduction, startTime) False _ = (Introduction, startTime + dt)
+transition dt (Introduction, startTime) True  _ 
+   | startTime > 1 = (FadeIn 1, 0)
+   | startTime < 1 = (Introduction, startTime + dt)
+transition dt (FadeIn n, startTime) _ _
+   | n > 0 = (FadeIn (n - 0.01), startTime + dt)
+   | n <= 0 = (Play, 0)
+transition dt (Play, startTime) _ False = (Play, startTime + dt)
+transition _ (Play, startTime) _ True = (FadeOut 0, 0)
+transition dt (FadeOut n, startTime) _ _
+   | n < 1 = (FadeOut (n + 0.01), startTime + dt)
+   | n >= 1 = (End, 0)
+transition dt (End, startTime) _ _ = (End, startTime + dt)
+
+-- wait a second so that enter is not triggered immediately when transitioning
+activeSignal = do
+              accum <- stateful 0 (+)
+              transfer False (\dt a b -> b || (a > 1)) accum

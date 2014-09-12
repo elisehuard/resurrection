@@ -306,16 +306,26 @@ colliding lifeform position = xcolliding lifeform position && ycolliding lifefor
 
 -- the actual rendering
 renderFrame :: Textures -> FTGL.Font -> Window -> (GLdouble, GLdouble) -> LevelState -> IO ()
-renderFrame textures font window windowSize (LevelState _ world player life success) = do 
+renderFrame textures font window windowSize (LevelState level state world player life success) = do 
                                                 clear [ColorBuffer, DepthBuffer]
                                                 drawWorld world textures
                                                 drawPlayer player textures
-                                                let fontColor = Color4 1 1 1 (1 :: GLfloat)
-                                                printText fontColor font 24 windowSize (Vertex2 (-260) 200) $ show life
-                                                if success then
-                                                   printText fontColor font 24 windowSize (Vertex2 (-50) 0) "Congratulations!"
-                                                else
-                                                   printText fontColor font 24 windowSize (Vertex2 (-260) 200) $ show life
+                                                let fontColor = Color4 0 0 0 (1 :: GLfloat)
+                                                color $ fontColor
+                                                printText font 24 windowSize (Vertex2 (-260) 200) $ show life
+                                                case state of
+                                                  Introduction -> do
+                                                     coverQuad windowSize 1
+                                                     color $ Color4 1 1 1 (1 :: GLfloat)
+                                                     introductionText level windowSize font
+                                                  FadeIn n -> coverQuad windowSize n
+                                                  FadeOut n -> coverQuad windowSize n
+                                                  End -> do
+                                                     coverQuad windowSize 1
+                                                     color $ Color4 1 1 1 (1 :: GLfloat)
+                                                     printText font 24 windowSize (Vertex2 (-100) 0) "Congratulations!"
+                                                  _ -> return () -- playing hence nothing needs to happen
+                                                color $ Color4 1 1 1 (1 :: GLfloat)
                                                 flush
                                                 swapBuffers window
                                                 pollEvents -- Necessary for it not to freeze.
@@ -329,3 +339,34 @@ renderFrame textures font window windowSize (InBetweenState level world fade) = 
                                                 flush
                                                 swapBuffers window
                                                 pollEvents -- Necessary for it not to freeze.
+
+coverQuad (width, height) fade = do
+   color $ Color4 0 0 0 (fade :: GLfloat)
+   let x = (320 :: GLdouble)
+       y = (240 :: GLdouble)
+   loadIdentity
+   renderPrimitive Quads $ do
+           vertex $ Vertex2 0 (0 :: GLdouble)
+           vertex $ Vertex2 width 0
+           vertex $ Vertex2 width height
+           vertex $ Vertex2 0 height
+
+introductionText (Level 1) windowSize font = do
+                                let line1 = "This world needs some grass to get it going."
+                                    line2 = "Go to the dead grass and push space bar to"
+                                    line3 = "donate some of your life to it!"
+                                    end = "press <enter> to get started"
+                                printText font 18 windowSize (Vertex2 (-260) 100) line1
+                                printText font 18 windowSize (Vertex2 (-260) 50) line2
+                                printText font 18 windowSize (Vertex2 (-260) 0) line3
+                                printText font 18 windowSize (Vertex2 (-260) (-80)) end
+introductionText (Level 2) windowSize font = do
+                                let line1 = "we need to add some rabbits to the mix,"
+                                    line2 = "but they are expensive!"
+                                    line3 = "Kill some grass with key k."
+                                    end = "press enter to get started"
+                                printText font 18 windowSize (Vertex2 (-260) 100) line1
+                                printText font 18 windowSize (Vertex2 (-260) 50) line2
+                                printText font 18 windowSize (Vertex2 (-260) 0) line3
+                                printText font 18 windowSize (Vertex2 (-260) (-80)) end
+

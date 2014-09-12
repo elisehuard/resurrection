@@ -42,7 +42,11 @@ type Textures = Map.Map String (Maybe TextureObject)
 data Level = Between Int | Level Int
              deriving Show
 
+data LevelStage = Introduction | FadeIn GLfloat | Play | FadeOut GLfloat | End
+                  deriving (Show, Eq)
+
 data LevelState = LevelState { level :: Level
+                             , stage :: LevelStage
                              , world :: World
                              , player :: Player
                              , life :: Life
