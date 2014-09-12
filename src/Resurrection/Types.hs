@@ -52,7 +52,3 @@ data LevelState = LevelState { level :: Level
 -- transfer of data related to sounds
 data SoundSignal = SoundSignal { res :: Bool,
                                killing :: Bool }
-
--- passing in textures as reader
-class Draw a where
-  draw :: a -> Textures -> IO ()

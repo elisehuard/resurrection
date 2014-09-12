@@ -25,8 +25,6 @@ main = do
     let width  = 640
         height = 480
 
-    (keyPress,keyPressSink) <- external Nothing
-    (closeGame, closeGameSink) <- external False
     (windowSize,windowSizeSink) <- external (fromIntegral width, (fromIntegral height :: GLdouble))
     closed <- newIORef False
 
@@ -34,8 +32,6 @@ main = do
           initGL width height
           setWindowCloseCallback     win $ Just $ windowCloseCallback closed
           setWindowSizeCallback      win $ Just $ resizeGL windowSizeSink
-
-          -- player grass levelbackground
 
           textures <- loadTextures
           font <- loadFont "fonts/Sketch_Block.ttf"

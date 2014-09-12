@@ -152,8 +152,6 @@ lookupTexture name textures = fromJust (Map.lookup name textures)
 toTexture (x,y) = texCoord2f (TexCoord2 x y)
                 where texCoord2f = texCoord :: TexCoord2 GLfloat -> IO ()
 
--- draw individual components
-
 --textureName :: (Draw a) => a -> String
 backgroundTexture (Background (Level _) _) = lookupTexture "level-1"
 backgroundTexture (Background (Between _) _) = lookupTexture "between-1"
@@ -167,12 +165,11 @@ legTexture (Player {direction = GoBack}) = lookupTexture "alien-leg"
 legTexture (Player {direction = GoLeft}) = lookupTexture "alien-leg-left"
 legTexture (Player {direction = GoRight}) = lookupTexture "alien-leg-right"
 
-instance Draw Player where
-   draw player textures = do 
-                            loadIdentity
-                            drawLeftLeg player (legTexture player textures)
-                            drawRightLeg player (legTexture player textures)
-                            drawBody player (bodyTexture player textures)
+drawPlayer player textures = do 
+                                loadIdentity
+                                drawLeftLeg player (legTexture player textures)
+                                drawRightLeg player (legTexture player textures)
+                                drawBody player (bodyTexture player textures)
 
 drawBody (Player (Vector2 x y) direction _ _) bodyTexture = do 
                                                             texture Texture2D $= Enabled
@@ -205,7 +202,7 @@ drawLeftLeg (Player (Vector2 x y) GoBack Walking tick) legTexture = do
                                                         let animy = realToFrac $ sin tick
                                                         drawLeg (x - playerWidth/2 + 10) (y - playerHeight/2) 0 animy legTexture
 
-drawRightLeg (Player (Vector2 x y) direction Neutral tick) legTexture =  drawLeg (x + playerWidth/2 - 30) (y - playerHeight/2) 0 0 legTexture
+drawRightLeg (Player (Vector2 x y) direction Neutral _) legTexture =  drawLeg (x + playerWidth/2 - 30) (y - playerHeight/2) 0 0 legTexture
 
 drawRightLeg (Player (Vector2 x y) Front Walking tick) legTexture = do 
                                                         let animy = realToFrac $ cos tick
@@ -245,53 +242,16 @@ lifeformTexture (Lifeform _ Grass Dead _) = lookupTexture "grass-dead"
 -- fade going from 0 to 1 ?
 fadeInPlayer textures fade = do let x = 300
                                     y = 240
-                                    playerTexture = lookupTexture "alien-body" textures
-                                texture Texture2D $= Enabled
-                                textureBinding Texture2D $= playerTexture
-                                textureFunction $= Replace
-                                renderPrimitive Quads $ do
-                                    toTexture (0,1)
-                                    vertex $ Vertex2 (x - playerWidth/2) (y - playerHeight/2)
-                                    toTexture (1,1)
-                                    vertex $ Vertex2 (x + playerWidth/2) (y - playerHeight/2)
-                                    toTexture (1,0)
-                                    vertex $ Vertex2 (x + playerWidth/2) (y + playerHeight/2)
-                                    toTexture (0,0)
-                                    vertex $ Vertex2 (x - playerWidth/2) (y + playerHeight/2)
-                                texture Texture2D $= Disabled
+                                drawPlayer Player {pos = Vector2 x y, direction = Front, action = Neutral, tick = 0 } textures
                                 color $ Color4 0 0 0 (1 - fade)
                                 renderPrimitive Quads $ do
-                                    vertex $ Vertex2 (x - playerWidth/2) (y - playerHeight/2)
-                                    vertex $ Vertex2 (x + playerWidth/2) (y - playerHeight/2)
+                                    vertex $ Vertex2 (x - playerWidth/2) (y - playerHeight/2 - 10)
+                                    vertex $ Vertex2 (x + playerWidth/2) (y - playerHeight/2 - 10)
                                     vertex $ Vertex2 (x + playerWidth/2) (y + playerHeight/2)
                                     vertex $ Vertex2 (x - playerWidth/2) (y + playerHeight/2)
                                 color $ Color4 1 1 1 (1 :: GLfloat)
-                                {-
-                                --activeTexture $= TextureUnit 1
-                                texture Texture2D $= Enabled
-                                -- alpha channel modulated
-                                constantColor $= Color4 0 0 0 fade
-                                textureBinding Texture2D $= playerTexture
-                                textureFunction $= Combine
-                                combineRGB $= Interpolate
-                                argRGB Arg0 $= Arg SrcColor CurrentUnit
-                                argRGB Arg1 $= Arg SrcColor Previous
-                                argRGB Arg2 $= Arg SrcAlpha Constant
-                                --textureFunction $= Replace
-                                renderPrimitive Quads $ do
-                                    toTexture (0,1)
-                                    vertex $ Vertex2 (x - playerWidth/2) (y - playerHeight/2)
-                                    toTexture (1,1)
-                                    vertex $ Vertex2 (x + playerWidth/2) (y - playerHeight/2)
-                                    toTexture (1,0)
-                                    vertex $ Vertex2 (x + playerWidth/2) (y + playerHeight/2)
-                                    toTexture (0,0)
-                                    vertex $ Vertex2 (x - playerWidth/2) (y + playerHeight/2)
-                                texture Texture2D $= Disabled
-                                -}
 
-instance Draw Lifeform where
-  draw lifeform@(Lifeform (Vector2 x y) Grass alive _) textures = do
+drawLifeform lifeform@(Lifeform (Vector2 x y) Grass alive _) textures = do
                                     let mbTexture = lifeformTexture lifeform textures
                                     texture Texture2D $= Enabled
                                     textureFunction $= Replace
@@ -308,28 +268,28 @@ instance Draw Lifeform where
                                         vertex $ Vertex2 (x - grassSize) (y + grassSize)
                                     texture Texture2D $= Disabled
 
-instance Draw Background where
-  draw background@(Background _ (width, height)) textures = do  let mbTexture = backgroundTexture background textures
-                                                                --activeTexture $= TextureUnit 0
-                                                                texture Texture2D $= Enabled
-                                                                textureBinding Texture2D $= mbTexture
-                                                                textureFunction $= Modulate
-                                                                loadIdentity
-                                                                renderPrimitive Quads $ do
-                                                                    toTexture (0, 1) 
-                                                                    vertex $ Vertex2 (0 :: GLdouble) 0
-                                                                    toTexture (1, 1)
-                                                                    vertex $ Vertex2 width           0
-                                                                    toTexture (1, 0)
-                                                                    vertex $ Vertex2 width           height
-                                                                    toTexture (0, 0)
-                                                                    vertex $ Vertex2 0               height
-                                                                -- texture Texture2D $= Disabled
+drawBackground background@(Background _ (width, height)) textures = do
+                                    let mbTexture = backgroundTexture background textures
+                                    --activeTexture $= TextureUnit 0
+                                    texture Texture2D $= Enabled
+                                    textureBinding Texture2D $= mbTexture
+                                    textureFunction $= Modulate
+                                    loadIdentity
+                                    renderPrimitive Quads $ do
+                                        toTexture (0, 1) 
+                                        vertex $ Vertex2 (0 :: GLdouble) 0
+                                        toTexture (1, 1)
+                                        vertex $ Vertex2 width           0
+                                        toTexture (1, 0)
+                                        vertex $ Vertex2 width           height
+                                        toTexture (0, 0)
+                                        vertex $ Vertex2 0               height
+                                    -- texture Texture2D $= Disabled
 
 -- data World = World Background [Lifeform]
-instance Draw World where
-  draw (World background lifeforms) textures = do draw background textures
-                                                  mapM ((flip draw) textures) lifeforms
+drawWorld (World background lifeforms) textures = do 
+                                                  drawBackground background textures
+                                                  mapM ((flip drawLifeform) textures) lifeforms
                                                   return ()
 
 -- collision detection - is geometry graphics or not?
@@ -348,8 +308,8 @@ colliding lifeform position = xcolliding lifeform position && ycolliding lifefor
 renderFrame :: Textures -> FTGL.Font -> Window -> (GLdouble, GLdouble) -> LevelState -> IO ()
 renderFrame textures font window windowSize (LevelState _ world player life success) = do 
                                                 clear [ColorBuffer, DepthBuffer]
-                                                draw world textures
-                                                draw player textures
+                                                drawWorld world textures
+                                                drawPlayer player textures
                                                 let fontColor = Color4 1 1 1 (1 :: GLfloat)
                                                 printText fontColor font 24 windowSize (Vertex2 (-260) 200) $ show life
                                                 if success then
@@ -362,7 +322,7 @@ renderFrame textures font window windowSize (LevelState _ world player life succ
 
 renderFrame textures font window windowSize (InBetweenState level world fade) = do 
                                                 clear [ColorBuffer, DepthBuffer]
-                                                draw world textures
+                                                drawWorld world textures
                                                 let fadeGLDouble = (realToFrac fade :: CDouble)
                                                     toGLFloat (CDouble c) = CFloat $ double2Float c
                                                 fadeInPlayer textures $ toGLFloat fadeGLDouble
