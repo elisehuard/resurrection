@@ -139,7 +139,9 @@ loadTextures = do
                                 , ("alien-leg-right", "images/alien-leg-side.png")
                                 , ("alien-leg-left", "images/alien-leg-left.png")
                                 , ("grass-dead", "images/grass-dead.png")
-                                , ("grass-alive", "images/grass-alive.png")] 
+                                , ("grass-alive", "images/grass-alive.png")
+                                , ("rabbit-dead", "images/rabbit-dead.png")
+                                , ("rabbit-alive", "images/rabbit-alive.png")]
                   list <- mapM (\(name, file) -> do 
                                   texture <- loadTexture file
                                   return $ (,) name texture) textures
@@ -238,6 +240,8 @@ drawLeg x y animx animy legTexture = do
 
 lifeformTexture (Lifeform _ Grass Alive _) = lookupTexture "grass-alive"
 lifeformTexture (Lifeform _ Grass Dead _) = lookupTexture "grass-dead"
+lifeformTexture (Lifeform _ Rabbit Alive _) = lookupTexture "rabbit-alive" -- but that will be hopping soon :)
+lifeformTexture (Lifeform _ Rabbit Dead _) = lookupTexture "rabbit-dead"
 
 -- fade going from 0 to 1 ?
 fadeInPlayer textures fade = do let x = 300
@@ -251,7 +255,7 @@ fadeInPlayer textures fade = do let x = 300
                                     vertex $ Vertex2 (x - playerWidth/2) (y + playerHeight/2)
                                 color $ Color4 1 1 1 (1 :: GLfloat)
 
-drawLifeform lifeform@(Lifeform (Vector2 x y) Grass alive _) textures = do
+drawLifeform lifeform@(Lifeform (Vector2 x y) _ alive _) textures = do
                                     let mbTexture = lifeformTexture lifeform textures
                                     texture Texture2D $= Enabled
                                     textureFunction $= Replace
@@ -297,9 +301,9 @@ drawWorld (World background lifeforms) textures = do
 -- grass x - grassSize
 -- 
 -- todo: define shape type and collisions between several types of shape, instead of between player and lifeform
-xcolliding (Lifeform (Vector2 g1 g2) Grass _ _) (Vector2 x y) = ((x - playerWidth/2)  > (g1 - grassSize) && (x - playerWidth/2) < (g1 + grassSize)) ||
+xcolliding (Lifeform (Vector2 g1 g2) _ _ _) (Vector2 x y) = ((x - playerWidth/2)  > (g1 - grassSize) && (x - playerWidth/2) < (g1 + grassSize)) ||
                                                               ((x + playerWidth/2) > (g1 - grassSize) && (x + playerWidth/2) < (g1 + grassSize))
-ycolliding (Lifeform (Vector2 g1 g2) Grass _ _) (Vector2 x y) = ((y - playerHeight/2)  > (g2 - grassSize) && (x - playerHeight/2) < (g2 + grassSize)) ||
+ycolliding (Lifeform (Vector2 g1 g2) _ _ _) (Vector2 x y) = ((y - playerHeight/2)  > (g2 - grassSize) && (x - playerHeight/2) < (g2 + grassSize)) ||
                                                               ((y + playerHeight/2) > (g2 - grassSize) && (x + playerHeight/2) < (g2 + grassSize))
 
 colliding lifeform position = xcolliding lifeform position && ycolliding lifeform position
@@ -319,7 +323,10 @@ renderFrame textures font window windowSize (LevelState level state world player
                                                      color $ Color4 1 1 1 (1 :: GLfloat)
                                                      introductionText level windowSize font
                                                   FadeIn n -> coverQuad windowSize n
-                                                  FadeOut n -> coverQuad windowSize n
+                                                  FadeOut n -> do
+                                                     coverQuad windowSize n
+                                                     color $ Color4 1 1 1 (1 :: GLfloat)
+                                                     printText font 24 windowSize (Vertex2 (-100) 0) "Congratulations!"
                                                   End -> do
                                                      coverQuad windowSize 1
                                                      color $ Color4 1 1 1 (1 :: GLfloat)

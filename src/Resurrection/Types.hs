@@ -14,7 +14,7 @@ type Life = Int
 data Background = Background Level (GLdouble, GLdouble)
                   deriving Show
 
-data Species = Grass
+data Species = Grass | Rabbit
                deriving Show
 
 data Lifeform = Lifeform (Vector2 GLdouble) Species LifeStatus Life

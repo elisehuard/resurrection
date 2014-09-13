@@ -125,6 +125,9 @@ dead (Lifeform _ _ _    _) = False
 alive (Lifeform _ _ Alive _) = True
 alive (Lifeform _ _ _    _) = False
 
+rabbits (Lifeform _ Rabbit _ _) = True
+rabbits (Lifeform _ _ _ _) = False
+
 -- remove any lifeforms that haven't been completely resurrected -- todo when using resurrecting and dying status
 -- completed lifeforms = lifeforms
 
@@ -150,13 +153,13 @@ killColliding False lifeform = lifeform
 --   - initial world
 --   - explanatory text
 goalAchieved (Level 1) (World _ lifeforms) _ _ = all alive lifeforms
-goalAchieved (Level 2) (World _ lifeforms) _ _ = any alive lifeforms
+goalAchieved (Level 2) (World _ lifeforms) _ _ = any (\l -> alive l && rabbits l) lifeforms
 
 inBetweenWorld (Between 1) = World (Background (Between 1) (640, 480)) []
 inBetweenWorld (Between 2) = World (Background (Between 1) (640, 480)) []
 
 initialWorld (Level 1) = World (Background (Level 1) (640, 480)) [Lifeform (Vector2 300 300) Grass Dead 5]
-initialWorld (Level 2) = World (Background (Level 1) (640, 480)) [Lifeform (Vector2 200 200) Grass Dead 5, Lifeform (Vector2 400 400) Grass Dead 5]
+initialWorld (Level 2) = World (Background (Level 1) (640, 480)) [Lifeform (Vector2 200 200) Grass Alive 5, Lifeform (Vector2 400 400) Grass Alive 5, Lifeform (Vector2 100 100) Rabbit Dead 25]
 
 -- boolean indicates whether goal of level was achieved
 levelProgression _ False current = current
@@ -176,8 +179,9 @@ transition dt (FadeIn n, startTime) _ _
 transition dt (Play, startTime) _ False = (Play, startTime + dt)
 transition _ (Play, startTime) _ True = (FadeOut 0, 0)
 transition dt (FadeOut n, startTime) _ _
-   | n < 1 = (FadeOut (n + 0.01), startTime + dt)
-   | n >= 1 = (End, 0)
+   | startTime < 1 = (FadeOut 0, startTime + dt)
+   | startTime >= 1 && startTime < 2 = (FadeOut (n + 0.01), startTime + dt)
+   | startTime >= 2 = (End, 0)
 transition dt (End, startTime) _ _ = (End, startTime + dt)
 
 -- wait a second so that enter is not triggered immediately when transitioning
