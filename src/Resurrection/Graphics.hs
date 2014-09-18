@@ -126,6 +126,7 @@ loadTexture path = do
 loadTextures :: IO Textures
 loadTextures = do 
                   let textures = [("level-1", "images/background-1.png")
+                                , ("level-2", "images/background-2.png")
                                 , ("between-1", "images/between-1.png")
                                 , ("alien-front", "images/alien.png")
                                 , ("alien-back", "images/alien-back.png")
@@ -155,7 +156,8 @@ toTexture (x,y) = texCoord2f (TexCoord2 x y)
                 where texCoord2f = texCoord :: TexCoord2 GLfloat -> IO ()
 
 --textureName :: (Draw a) => a -> String
-backgroundTexture (Background (Level _) _) = lookupTexture "level-1"
+backgroundTexture (Background (Level 1) _) = lookupTexture "level-1"
+backgroundTexture (Background (Level 2) _) = lookupTexture "level-2"
 backgroundTexture (Background (Between _) _) = lookupTexture "between-1"
 
 bodyTexture (Player {direction = Front}) = lookupTexture "alien-body"
@@ -331,6 +333,13 @@ renderFrame textures font window windowSize (LevelState level state world player
                                                      coverQuad windowSize 1
                                                      color $ Color4 1 1 1 (1 :: GLfloat)
                                                      printText font 24 windowSize (Vertex2 (-100) 0) "Congratulations!"
+                                                  FadeOutFail n -> do
+                                                     coverQuad windowSize n
+                                                     color $ Color4 1 1 1 (1 :: GLfloat)
+                                                  Fail -> do
+                                                     coverQuad windowSize 1
+                                                     color $ Color4 1 1 1 (1 :: GLfloat)
+                                                     printText font 24 windowSize (Vertex2 (-100) 0) "You died :("
                                                   _ -> return () -- playing hence nothing needs to happen
                                                 color $ Color4 1 1 1 (1 :: GLfloat)
                                                 flush

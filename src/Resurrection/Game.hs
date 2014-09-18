@@ -64,18 +64,20 @@ playLevel window level@(Level _) directionControl resurrectControl killControl n
 
                                 -- state of the world
                                 -- todo: initialWorld in function of level
-                                world <- transfer3 (initialWorld level) (\dt p r k w -> worldEvolution dt p r k w) player' resurrectControl killControl
+                                world <- transfer4 (initialWorld level) (\dt p r k f w -> worldEvolution level dt p r k f w) player' resurrectControl killControl failed
                                 world' <- delay (initialWorld level) world
 
                                 -- todo: initialLife in function of level? or continuation of upper level stuff?
-                                life <- transfer2 20 lifeAccounting resurrections' killing'
+                                life <- transfer3 20 lifeAccounting resurrections' killing' failed
                                 life' <- delay 20 life
 
                                 let success = goalAchieved level <$> world' <*> player' <*> life'
 
                                 trackLevelStage <- transfer3 (Introduction, 0) (\dt next succeeded l stage -> transition dt stage next succeeded l) nextControl success life'
-                                let levelStage = fst <$> trackLevelStage 
+                                trackLevelStage' <- delay (Introduction, 0) trackLevelStage
+                                let levelStage = fst <$> trackLevelStage'
                                     completed = (== End) <$> levelStage
+                                    failed = (== Fail) <$> levelStage
 
                                 return ( LevelState level <$> levelStage <*> world <*> player <*> life <*> success -- level state
                                         , soundSignal <$> resurrections <*> killing -- notifications for sound
@@ -106,7 +108,8 @@ tally lifeforms = foldr addLifeformCost 0 lifeforms
 
 addLifeformCost (Lifeform _ _ _ cost) currentCount = currentCount + cost
 
-lifeAccounting dt (_, resurrections) (_, killings) currentLife = currentLife - (tally resurrections) + (tally killings)
+lifeAccounting dt (_, resurrections) (_, killings) False currentLife = currentLife - (tally resurrections) + (tally killings)
+lifeAccounting dt _ _ True _ = 20 -- reinitialize on fail
 
 resurrectScope lifeforms position = filter (\l ->  dead l && colliding l position) lifeforms
 killScope lifeforms position = filter (\l ->  alive l && colliding l position) lifeforms
@@ -125,10 +128,11 @@ rabbits (Lifeform _ _ _ _) = False
 -- if player stands on lifeform, and lifeform is dead, and they press space (for resurrect), then the lifeform resurrects
 -- todo next step: points accounting (lifeform cost + player life down)
 -- todo: evolution of the life going from player to thing + way to represent this (text first step?)
-worldEvolution dt (Player position _ _ _) True False  (World background lifeforms) = World background (resurrect dt lifeforms position)
-worldEvolution dt (Player position _ _ _) False True  (World background lifeforms) = World background (kill dt lifeforms position)
-worldEvolution dt (Player position _ _ _) True True   world                        = world -- confused player
-worldEvolution dt _                       False False world                        = world
+worldEvolution _ dt (Player position _ _ _) True False False (World background lifeforms) = World background (resurrect dt lifeforms position)
+worldEvolution _ dt (Player position _ _ _) False True False (World background lifeforms) = World background (kill dt lifeforms position)
+worldEvolution level dt (Player position _ _ _) False True True  _ = initialWorld level -- reinitialize on fail
+worldEvolution _ dt (Player position _ _ _) True True   _ world                        = world -- confused player
+worldEvolution _ dt _                       False False _ world                        = world
 
 resurrect dt lifeforms position = map (\lifeform -> resurrectColliding (colliding lifeform position) lifeform) lifeforms
 kill dt lifeforms position = map (\lifeform -> killColliding (colliding lifeform position) lifeform) lifeforms
@@ -143,6 +147,7 @@ killColliding False lifeform = lifeform
 --   - goal to be achieved
 --   - initial world
 --   - explanatory text
+goalAchieved a w c d | trace ("goalachieved " ++ show w) False = undefined
 goalAchieved (Level 1) (World _ lifeforms) _ _ = all alive lifeforms
 goalAchieved (Level 2) (World _ lifeforms) _ _ = any (\l -> alive l && rabbits l) lifeforms
 
@@ -150,7 +155,7 @@ inBetweenWorld (Between 1) = World (Background (Between 1) (640, 480)) []
 inBetweenWorld (Between 2) = World (Background (Between 1) (640, 480)) []
 
 initialWorld (Level 1) = World (Background (Level 1) (640, 480)) [Lifeform (Vector2 300 300) Grass Dead 5]
-initialWorld (Level 2) = World (Background (Level 1) (640, 480)) [Lifeform (Vector2 200 200) Grass Alive 5, Lifeform (Vector2 400 400) Grass Alive 5, Lifeform (Vector2 100 100) Rabbit Dead 25]
+initialWorld (Level 2) = World (Background (Level 2) (640, 480)) [Lifeform (Vector2 200 200) Grass Alive 5, Lifeform (Vector2 400 400) Grass Alive 5, Lifeform (Vector2 100 100) Rabbit Dead 25]
 
 -- boolean indicates whether goal of level was achieved
 levelProgression _ False current = current
@@ -158,22 +163,34 @@ levelProgression _ True (Level n) = Level (n + 1)
 levelProgression _ True (Between n) = Level n
 
 -- transition of level stage
--- (\dt next succeeded stage -> transition stage next succeeded)
+-- (\dt next succeeded stage life -> transition stage next succeeded life)
 -- also return the time since last transition - no transitions right after arriving into state
-transition dt (Introduction, startTime) False _ = (Introduction, startTime + dt)
-transition dt (Introduction, startTime) True  _ 
+-- if life dips below 0: fail!
+transition dt (Introduction, startTime) False _ _ = (Introduction, startTime + dt)
+transition dt (Introduction, startTime) True  _ _
    | startTime > 1 = (FadeIn 1, 0)
    | startTime < 1 = (Introduction, startTime + dt)
-transition dt (FadeIn n, startTime) _ _
+transition dt (FadeIn n, startTime) _ _ _
    | n > 0 = (FadeIn (n - 0.01), startTime + dt)
    | n <= 0 = (Play, 0)
-transition dt (Play, startTime) _ False = (Play, startTime + dt)
-transition _ (Play, startTime) _ True = (FadeOut 0, 0)
-transition dt (FadeOut n, startTime) _ _
+transition dt (Play, startTime) _ False life
+   | life > 0 = (Play, startTime + dt)
+   | life <= 0 = (FadeOutFail 0, 0)
+transition _ (Play, startTime) _ True life -- end with positive life!
+   | life > 0 = (FadeOut 0, 0)
+   | life <= 0 = (FadeOutFail 0, 0)
+transition dt (FadeOut n, startTime) _ _ life
+   | life <= 0 = (FadeOutFail 0, 0)
    | startTime < 1 = (FadeOut 0, startTime + dt)
    | startTime >= 1 && startTime < 2 = (FadeOut (n + 0.01), startTime + dt)
    | startTime >= 2 = (End, 0)
-transition dt (End, startTime) _ _ = (End, startTime + dt)
+transition dt (End, startTime) _ _ _ = (End, startTime + dt)
+transition dt (FadeOutFail n, startTime) _ _ _
+   | startTime < 1 = (FadeOutFail 0, startTime + dt)
+   | startTime >= 1 && startTime < 2 = (FadeOutFail (n + 0.01), startTime + dt)
+   | startTime >= 2 = (Fail, 0)
+transition dt (Fail, startTime) True _ _ = (FadeIn 0, startTime)
+transition dt (Fail, startTime) False _ _ = (Fail, startTime)
 
 -- wait a second so that enter is not triggered immediately when transitioning
 activeSignal = do
