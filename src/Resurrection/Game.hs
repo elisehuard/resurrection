@@ -34,76 +34,67 @@ oscillating t
 outputFunction :: Textures -> FTGL.Font -> Window -> (GLdouble, GLdouble) -> LevelState -> SoundSignal -> IO ()
 outputFunction textures font window windowSize levelState soundSignals =  (renderFrame textures font window windowSize levelState) >> (playSounds soundSignals)
 
-resurrection :: Signal (GLdouble, GLdouble) -> Textures -> FTGL.Font -> Window -> SignalGen Double (Signal (IO())) 
-resurrection windowSize textures font window = mdo
+resurrection :: Signal (GLdouble, GLdouble) -> Textures -> FTGL.Font -> Window -> Signal (Bool, Bool, Bool, Bool)
+             -> Signal Bool -> Signal Bool -> Signal Bool -> SignalGen Double (Signal (IO())) 
+resurrection windowSize textures font window directionKey resurrectKey killKey nextKey = mdo
   let initialLevel = Between 1
-      startLevel level = playLevel window level
+      startLevel dk rk kk nk level = playLevel window level dk rk kk nk
 
-  (levelState, soundState, levelTrigger) <- levelGen (startLevel <$> levelCount)
+  (levelState, soundState, levelTrigger) <- levelGen (startLevel directionKey resurrectKey killKey nextKey <$> levelCount)
   levelTrigger' <- delay False levelTrigger
   levelCount <- transfer initialLevel levelProgression levelTrigger'
   return $ (outputFunction textures font window) <$> windowSize <*> levelState <*> soundState
 
 
-playLevel :: Window -> Level -> SignalGen Double (Signal LevelState, Signal SoundSignal, Signal Bool)
-playLevel window level@(Level _) = mdo 
-                                              directionControl <- effectful $ (,,,)
-                                                <$> keyIsPressed window Key'Left
-                                                <*> keyIsPressed window Key'Up
-                                                <*> keyIsPressed window Key'Down
-                                                <*> keyIsPressed window Key'Right
-                                              resurrectControl <- effectful $ keyIsPressed window Key'Space
-                                              killControl <- effectful $ keyIsPressed window Key'K
-                                              nextControl <- effectful $ keyIsPressed window Key'Enter
+playLevel :: Window -> Level -> Signal (Bool, Bool, Bool, Bool) -> Signal Bool -> Signal Bool -> Signal Bool -> SignalGen Double (Signal LevelState, Signal SoundSignal, Signal Bool)
+playLevel window level@(Level _) directionControl resurrectControl killControl nextControl = mdo
+                                -- life evolution todo
+                                --    when resurrecting something:
+                                --    decrement life until either the thing is resurrected or the player dies
+                                player <- transfer initialPlayer (\dt keyP p -> updateFromKey p keyP) directionControl
+                                player' <- delay initialPlayer player
 
-                                              -- life evolution todo
-                                              --    when resurrecting something:
-                                              --    decrement life until either the thing is resurrected or the player dies
-                                              -- player: initialPlayer in function of level? or continuation of upper level stuff?
-                                              player <- transfer initialPlayer (\dt keyP p -> updateFromKey p keyP) directionControl
-                                              player' <- delay initialPlayer player
+                                -- signal containing resurrections: used to calculate cost to life and also evolution of the world
+                                resurrections <- transfer3 (False, []) (activated resurrectScope) player' resurrectControl world'
+                                resurrections' <- delay (False, []) resurrections
 
-                                              -- signal containing resurrections: used to calculate cost to life and also evolution of the world
-                                              resurrections <- transfer3 (False, []) (activated resurrectScope) player' resurrectControl world'
-                                              resurrections' <- delay (False, []) resurrections
+                                killing <- transfer3 (False, []) (activated killScope) player' killControl world'
+                                killing' <- delay (False, []) killing
 
-                                              killing <- transfer3 (False, []) (activated killScope) player' killControl world'
-                                              killing' <- delay (False, []) killing
 
-                                              -- todo: initialLife in function of level? or continuation of upper level stuff?
-                                              life <- transfer2 20 lifeAccounting resurrections' killing'
-                                              life' <- delay 20 life
+                                -- state of the world
+                                -- todo: initialWorld in function of level
+                                world <- transfer3 (initialWorld level) (\dt p r k w -> worldEvolution dt p r k w) player' resurrectControl killControl
+                                world' <- delay (initialWorld level) world
 
-                                              -- state of the world
-                                              -- todo: initialWorld in function of level
-                                              world <- transfer3 (initialWorld level) (\dt p r k w -> worldEvolution dt p r k w) player' resurrectControl killControl
-                                              world' <- delay (initialWorld level) world
+                                -- todo: initialLife in function of level? or continuation of upper level stuff?
+                                life <- transfer2 20 lifeAccounting resurrections' killing'
+                                life' <- delay 20 life
 
-                                              let success = goalAchieved level <$> world <*> player <*> life
+                                let success = goalAchieved level <$> world' <*> player' <*> life'
 
-                                              trackLevelStage <- transfer2 (Introduction, 0) (\dt next succeeded stage -> transition dt stage next succeeded) nextControl success
-                                              let levelStage = fst <$> trackLevelStage 
-                                                  completed = (== End) <$> levelStage
+                                trackLevelStage <- transfer3 (Introduction, 0) (\dt next succeeded l stage -> transition dt stage next succeeded l) nextControl success life'
+                                let levelStage = fst <$> trackLevelStage 
+                                    completed = (== End) <$> levelStage
 
-                                              return ( LevelState level <$> levelStage <*> world <*> player <*> life <*> success -- level state
-                                                     , soundSignal <$> resurrections <*> killing -- notifications for sound
-                                                      , liftA2 (&&) completed nextControl ) -- goal achieved in level - move on to next
-                                              where soundSignal (boolRes, _) (boolKill, _) = SoundSignal boolRes boolKill
+                                return ( LevelState level <$> levelStage <*> world <*> player <*> life <*> success -- level state
+                                        , soundSignal <$> resurrections <*> killing -- notifications for sound
+                                        , liftA2 (&&) completed nextControl ) -- goal achieved in level - move on to next
+                                where soundSignal (boolRes, _) (boolKill, _) = SoundSignal boolRes boolKill
 
 -- player only needs to indicate when wants to progress
-playLevel window level@(Between _) = mdo 
-                                         nextControl <- effectful $ keyIsPressed window Key'Enter
-                                         -- signal to avoid passing to next level as soon as reached
-                                         active <- activeSignal
-                                         fadeIn <- stateful 0 (\dt previous -> cappedIncrease previous)
-                                         let state = InBetweenState level (inBetweenWorld level)
-                                             sound = SoundSignal False False
-                                         return ( state <$> fadeIn
-                                                , pure sound
-                                                , (&&) <$> nextControl <*> active )
-                                         where cappedIncrease num
-                                                    | num < 1 = num + 0.005
-                                                    | otherwise = 1
+playLevel window level@(Between _) directionControl resurrectControl killControl nextControl = mdo
+                                -- signal to avoid passing to next level as soon as reached
+                                active <- activeSignal
+                                fadeIn <- stateful 0 (\dt previous -> cappedIncrease previous)
+                                let state = InBetweenState level (inBetweenWorld level)
+                                    sound = SoundSignal False False
+                                return ( state <$> fadeIn
+                                    , pure sound
+                                    , (&&) <$> nextControl <*> active )
+                                where cappedIncrease num
+                                        | num < 1 = num + 0.005
+                                        | otherwise = 1
 
 -- signal only pops up value when starting resurrection of a lifeform
 
