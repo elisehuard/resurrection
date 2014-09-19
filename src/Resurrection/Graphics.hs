@@ -318,7 +318,7 @@ renderFrame textures font window windowSize (LevelState level state world player
                                                 drawPlayer player textures
                                                 let fontColor = Color4 0 0 0 (1 :: GLfloat)
                                                 color $ fontColor
-                                                printText font 24 windowSize (Vertex2 (-260) 200) $ show life
+                                                lifeBar life font windowSize
                                                 case state of
                                                   Introduction -> do
                                                      coverQuad windowSize 1
@@ -369,6 +369,28 @@ coverQuad (width, height) fade = do
            vertex $ Vertex2 width 0
            vertex $ Vertex2 width height
            vertex $ Vertex2 0 height
+
+lifeBar life font windowSize = do
+            if life <= 0
+                then do color $ Color4 1 0 0 (1 :: GLfloat)
+                        printText font 24 windowSize (Vertex2 (-260) 200) $ show life
+                else printText font 24 windowSize (Vertex2 (-260) 200) $ show life
+            let length = lifeLength life
+            color $ Color4 0.9 0.9 0.9 (1 :: GLfloat)
+            renderPrimitive Quads $ do
+                vertex $ Vertex2 40 (0 :: GLdouble)
+                vertex $ Vertex2 190 (0 :: GLdouble)
+                vertex $ Vertex2 190 (20 :: GLdouble)
+                vertex $ Vertex2 40 (20 :: GLdouble)
+            color $ Color4 0 1 0 (1 :: GLfloat)
+            renderPrimitive Quads $ do
+                vertex $ Vertex2 45 (5 :: GLdouble)
+                vertex $ Vertex2 length (5 :: GLdouble)
+                vertex $ Vertex2 length (15 :: GLdouble)
+                vertex $ Vertex2 45 (15 :: GLdouble)
+            where lifeLength life
+                    | life < 0 = 0
+                    | otherwise = 185/20 * (fromIntegral life)
 
 introductionText (Level 1) windowSize font = do
                                 let line1 = "This world needs some grass to get it going."
