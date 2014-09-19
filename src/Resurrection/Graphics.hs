@@ -329,12 +329,12 @@ renderFrame textures font window windowSize (LevelState level state world player
                                                      coverQuad windowSize n
                                                      color $ Color4 1 1 1 (1 :: GLfloat)
                                                      printText font 36 windowSize (Vertex2 (-100) 0) "Congratulations!"
-                                                     printText font 24 windowSize (Vertex2 (-260) (-80)) "press <enter> to get continue"
+                                                     printText font 24 windowSize (Vertex2 (-100) (-80)) "press <enter> to continue"
                                                   End -> do
                                                      coverQuad windowSize 1
                                                      color $ Color4 1 1 1 (1 :: GLfloat)
                                                      printText font 36 windowSize (Vertex2 (-100) 0) "Congratulations!"
-                                                     printText font 24 windowSize (Vertex2 (-260) (-80)) "press <enter> to get continue"
+                                                     printText font 24 windowSize (Vertex2 (-100) (-80)) "press <enter> to continue"
                                                   FadeOutFail n -> do
                                                      coverQuad windowSize n
                                                      color $ Color4 1 1 1 (1 :: GLfloat)
@@ -342,7 +342,7 @@ renderFrame textures font window windowSize (LevelState level state world player
                                                      coverQuad windowSize 1
                                                      color $ Color4 1 1 1 (1 :: GLfloat)
                                                      printText font 36 windowSize (Vertex2 (-100) 0) "You died :("
-                                                     printText font 24 windowSize (Vertex2 (-260) (-80)) "press <enter> to restart the level"
+                                                     printText font 24 windowSize (Vertex2 (-150) (-80)) "press <enter> to restart the level"
                                                   _ -> return () -- playing hence nothing needs to happen
                                                 color $ Color4 1 1 1 (1 :: GLfloat)
                                                 flush
