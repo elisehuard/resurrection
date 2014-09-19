@@ -39,7 +39,7 @@ main = do
           setWindowSizeCallback      win $ Just $ resizeGL windowSizeSink
 
           textures <- loadTextures
-          font <- loadFont "fonts/baveuse.ttf"
+          font <- loadFont "fonts/CabinSketch-Bold.ttf"
           __ <- forkIO (backgroundMusic "sounds/spooky.wav")
 
           -- All we need to get going is an IO-valued signal and an IO

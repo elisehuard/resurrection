@@ -328,18 +328,21 @@ renderFrame textures font window windowSize (LevelState level state world player
                                                   FadeOut n -> do
                                                      coverQuad windowSize n
                                                      color $ Color4 1 1 1 (1 :: GLfloat)
-                                                     printText font 24 windowSize (Vertex2 (-100) 0) "Congratulations!"
+                                                     printText font 36 windowSize (Vertex2 (-100) 0) "Congratulations!"
+                                                     printText font 24 windowSize (Vertex2 (-260) (-80)) "press <enter> to get continue"
                                                   End -> do
                                                      coverQuad windowSize 1
                                                      color $ Color4 1 1 1 (1 :: GLfloat)
-                                                     printText font 24 windowSize (Vertex2 (-100) 0) "Congratulations!"
+                                                     printText font 36 windowSize (Vertex2 (-100) 0) "Congratulations!"
+                                                     printText font 24 windowSize (Vertex2 (-260) (-80)) "press <enter> to get continue"
                                                   FadeOutFail n -> do
                                                      coverQuad windowSize n
                                                      color $ Color4 1 1 1 (1 :: GLfloat)
                                                   Fail -> do
                                                      coverQuad windowSize 1
                                                      color $ Color4 1 1 1 (1 :: GLfloat)
-                                                     printText font 24 windowSize (Vertex2 (-100) 0) "You died :("
+                                                     printText font 36 windowSize (Vertex2 (-100) 0) "You died :("
+                                                     printText font 24 windowSize (Vertex2 (-260) (-80)) "press <enter> to restart the level"
                                                   _ -> return () -- playing hence nothing needs to happen
                                                 color $ Color4 1 1 1 (1 :: GLfloat)
                                                 flush
@@ -372,17 +375,16 @@ introductionText (Level 1) windowSize font = do
                                     line2 = "Go to the dead grass and push space bar to"
                                     line3 = "donate some of your life to it!"
                                     end = "press <enter> to get started"
-                                printText font 18 windowSize (Vertex2 (-260) 100) line1
-                                printText font 18 windowSize (Vertex2 (-260) 50) line2
-                                printText font 18 windowSize (Vertex2 (-260) 0) line3
-                                printText font 18 windowSize (Vertex2 (-260) (-80)) end
+                                printText font 24 windowSize (Vertex2 (-260) 100) line1
+                                printText font 24 windowSize (Vertex2 (-260) 50) line2
+                                printText font 24 windowSize (Vertex2 (-260) 0) line3
+                                printText font 24 windowSize (Vertex2 (-260) (-80)) end
 introductionText (Level 2) windowSize font = do
                                 let line1 = "we need to add some rabbits to the mix,"
                                     line2 = "but they are expensive!"
                                     line3 = "Kill some grass with key k."
                                     end = "press enter to get started"
-                                printText font 18 windowSize (Vertex2 (-260) 100) line1
-                                printText font 18 windowSize (Vertex2 (-260) 50) line2
-                                printText font 18 windowSize (Vertex2 (-260) 0) line3
-                                printText font 18 windowSize (Vertex2 (-260) (-80)) end
-
+                                printText font 24 windowSize (Vertex2 (-260) 100) line1
+                                printText font 24 windowSize (Vertex2 (-260) 50) line2
+                                printText font 24 windowSize (Vertex2 (-260) 0) line3
+                                printText font 24 windowSize (Vertex2 (-260) (-80)) end
